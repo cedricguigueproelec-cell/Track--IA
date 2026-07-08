@@ -1,0 +1,10 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Do not commit real secrets if you copy server.cfg to a variant file
+server.local.cfg
+*.env

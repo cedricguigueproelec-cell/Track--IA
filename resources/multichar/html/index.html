@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Sélection de personnage</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="root" class="hidden">
+    <div class="bg-fx">
+      <div class="glow glow-a"></div>
+      <div class="glow glow-b"></div>
+      <div class="grid-overlay"></div>
+    </div>
+
+    <header class="header">
+      <div class="logo">TRACK<span>‑IA</span></div>
+      <div class="tagline">Roleplay Nouvelle Génération</div>
+    </header>
+
+    <main id="view-list" class="view">
+      <h1>Choisissez votre personnage</h1>
+      <div id="slots" class="slots"></div>
+    </main>
+
+    <main id="view-create" class="view hidden">
+      <h1>Nouveau personnage</h1>
+      <form id="create-form" class="form">
+        <div class="row">
+          <div class="field">
+            <label>Prénom</label>
+            <input type="text" name="firstname" maxlength="50" required>
+          </div>
+          <div class="field">
+            <label>Nom</label>
+            <input type="text" name="lastname" maxlength="50" required>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Date de naissance</label>
+            <input type="date" name="birthdate" required>
+          </div>
+          <div class="field">
+            <label>Nationalité</label>
+            <input type="text" name="nationality" maxlength="50" value="USA" required>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Genre</label>
+            <div class="segmented" data-name="gender">
+              <button type="button" class="seg-btn active" data-value="0">Homme</button>
+              <button type="button" class="seg-btn" data-value="1">Femme</button>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" id="cancel-create" class="btn btn-ghost">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer le personnage</button>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Police</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <span id="panel-title">Police</span>
+        <button id="close-btn" class="close-btn">✕</button>
+      </div>
+      <div class="panel-body">
+
+        <div id="view-armory" class="view hidden">
+          <div id="armory-list" class="list"></div>
+        </div>
+
+        <div id="view-garage" class="view hidden">
+          <div id="garage-list" class="list"></div>
+        </div>
+
+        <div id="view-search" class="view hidden">
+          <div id="search-name" class="subtitle"></div>
+          <div id="search-list" class="list"></div>
+        </div>
+
+        <div id="view-mdt" class="view hidden">
+          <div class="mdt-tabs">
+            <button class="mdt-tab active" data-tab="citizen">Citoyens</button>
+            <button class="mdt-tab" data-tab="plate">Plaques</button>
+          </div>
+          <div id="mdt-citizen" class="mdt-panel">
+            <input id="mdt-citizen-input" placeholder="Nom, prénom ou CID...">
+            <div id="mdt-citizen-results" class="list"></div>
+          </div>
+          <div id="mdt-plate" class="mdt-panel hidden">
+            <input id="mdt-plate-input" placeholder="Plaque d'immatriculation...">
+            <button id="mdt-plate-btn" class="btn">Rechercher</button>
+            <div id="mdt-plate-result" class="list"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

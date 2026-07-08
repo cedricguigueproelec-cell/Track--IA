@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: 'Inter', sans-serif; color: #fff; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud.hidden { display: none; }
+
+:root {
+  --neon-pink: #ff2d95;
+  --neon-purple: #8b2dff;
+  --neon-blue: #2de1ff;
+  --neon-green: #35ffb0;
+  --neon-yellow: #ffd23d;
+  --glass: rgba(15,10,25,0.55);
+  --glass-border: rgba(255,255,255,0.12);
+}
+
+/* ---------------- money panel ---------------- */
+.money-panel {
+  position: absolute; top: 22px; right: 22px;
+  background: var(--glass); border: 1px solid var(--glass-border); border-radius: 14px;
+  padding: 10px 16px; backdrop-filter: blur(14px);
+  display: flex; flex-direction: column; gap: 6px; min-width: 150px;
+}
+.money-row { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; font-family: 'Orbitron', sans-serif; }
+.money-icon {
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+}
+.money-icon.cash { background: linear-gradient(135deg, var(--neon-green), #1ea575); }
+.money-icon.bank { background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); }
+
+/* ---------------- vital rings ---------------- */
+.vitals { position: absolute; bottom: 24px; left: 24px; display: flex; gap: 12px; }
+.ring-wrap { position: relative; width: 54px; height: 54px; }
+.ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: rgba(255,255,255,0.12); stroke-width: 4; }
+.ring-fg { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 119.4; stroke-dashoffset: 0; transition: stroke-dashoffset .4s ease; }
+.ring-health  { stroke: var(--neon-pink); }
+.ring-armor   { stroke: var(--neon-blue); }
+.ring-hunger  { stroke: var(--neon-yellow); }
+.ring-thirst  { stroke: #4dd0ff; }
+.ring-stamina { stroke: var(--neon-green); }
+.ring-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; filter: drop-shadow(0 0 4px rgba(0,0,0,0.6)); }
+
+/* ---------------- voice indicator ---------------- */
+.voice-indicator {
+  position: absolute; bottom: 92px; left: 24px; width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(53,255,176,0.25); border: 1px solid var(--neon-green); display: flex; align-items: center; justify-content: center;
+  font-size: 15px; box-shadow: 0 0 16px rgba(53,255,176,0.6); animation: pulse 1s ease-in-out infinite;
+}
+.voice-indicator.hidden { display: none; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+/* ---------------- vehicle hud ---------------- */
+.vehicle-hud {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px;
+  padding: 14px 26px; backdrop-filter: blur(14px); text-align: center; min-width: 220px;
+}
+.vehicle-hud.hidden { display: none; }
+.speed { font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 34px; line-height: 1; }
+.speed-unit { font-size: 12px; margin-left: 6px; color: rgba(255,255,255,0.6); font-weight: 500; }
+.veh-meta { display: flex; align-items: center; gap: 14px; margin-top: 8px; font-size: 11px; color: rgba(255,255,255,0.7); }
+.fuel-bar { width: 60px; height: 6px; border-radius: 4px; background: rgba(255,255,255,0.15); overflow: hidden; }
+.fuel-fill { height: 100%; background: linear-gradient(90deg, var(--neon-green), var(--neon-yellow)); width: 100%; transition: width .3s ease; }
+.belt-indicator { padding: 2px 8px; border-radius: 6px; background: rgba(255,45,45,0.25); border: 1px solid #ff4d4d; color: #ff8080; font-weight: 700; letter-spacing: .5px; }
+.belt-indicator.on { background: rgba(53,255,176,0.2); border-color: var(--neon-green); color: var(--neon-green); }
+
+/* ---------------- toasts ---------------- */
+.toasts { position: absolute; top: 100px; right: 22px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.toast {
+  background: var(--glass); border: 1px solid var(--glass-border); border-left: 4px solid var(--neon-blue);
+  border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 600; backdrop-filter: blur(14px);
+  max-width: 280px; animation: toast-in .25s ease, toast-out .3s ease 3.7s forwards;
+}
+.toast.success { border-left-color: var(--neon-green); }
+.toast.error   { border-left-color: var(--neon-pink); }
+.toast.info    { border-left-color: var(--neon-blue); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(30px); } }

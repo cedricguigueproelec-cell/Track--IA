@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Inventaire</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="hotbar" class="hotbar hidden"></div>
+
+  <div id="panel" class="panel hidden">
+    <div class="panel-inner">
+      <section class="grid-section">
+        <div class="grid-header">
+          <span id="player-title">Inventaire</span>
+          <div class="weight-bar"><div id="player-weight-fill" class="weight-fill"></div></div>
+          <span id="player-weight-label" class="weight-label">0 / 0 kg</span>
+        </div>
+        <div id="player-grid" class="grid"></div>
+      </section>
+
+      <section id="secondary-section" class="grid-section hidden">
+        <div class="grid-header">
+          <span id="secondary-title">Coffre</span>
+          <div class="weight-bar"><div id="secondary-weight-fill" class="weight-fill"></div></div>
+          <span id="secondary-weight-label" class="weight-label">0 / 0 kg</span>
+        </div>
+        <div id="secondary-grid" class="grid"></div>
+      </section>
+    </div>
+
+    <div id="action-bar" class="action-bar hidden">
+      <span id="action-item-label" class="action-label"></span>
+      <input id="action-amount" type="number" min="1" value="1" class="amount-input">
+      <button id="action-use" class="btn btn-use">Utiliser</button>
+      <button id="action-transfer" class="btn btn-transfer">Transférer →</button>
+      <button id="action-drop" class="btn btn-drop">Jeter</button>
+      <button id="action-cancel" class="btn btn-cancel">✕</button>
+    </div>
+
+    <div class="close-hint">TAB pour fermer</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

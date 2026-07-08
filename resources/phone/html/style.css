@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;500;600;700&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: 'Inter', sans-serif; color: #fff; }
+.hidden { display: none !important; }
+
+:root { --neon-blue: #2de1ff; --neon-pink: #ff2d95; --neon-purple: #8b2dff; --neon-green: #35ffb0; --glass: rgba(12,8,22,0.9); --glass-light: rgba(255,255,255,0.07); --glass-border: rgba(255,255,255,0.14); }
+
+#phone { position: fixed; bottom: 18px; right: 26px; }
+
+.device {
+  width: 300px; height: 610px; border-radius: 40px; background: linear-gradient(160deg, #180a2e, #05030c);
+  border: 2px solid rgba(255,255,255,0.15); box-shadow: 0 0 60px rgba(139,45,255,0.35), 0 20px 60px rgba(0,0,0,0.6);
+  position: relative; overflow: hidden; padding: 14px;
+}
+.notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 22px; background: #05030c; border-radius: 0 0 14px 14px; z-index: 5; }
+.statusbar { display: flex; justify-content: space-between; font-size: 11px; padding: 6px 10px 10px; color: rgba(255,255,255,0.8); }
+
+.screen { height: calc(100% - 30px); overflow-y: auto; }
+
+.home-header { text-align: center; margin: 20px 0 24px; }
+.home-name { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 16px; }
+.home-number { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+
+.apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; padding: 0 12px; }
+.app { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; font-size: 11px; color: rgba(255,255,255,0.8); }
+.app-icon {
+  width: 60px; height: 60px; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 24px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+.app-icon.msg { background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple)); }
+.app-icon.contact { background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple)); }
+.app-icon.bank { background: linear-gradient(135deg, var(--neon-green), #1ea575); }
+.app-icon.sos { background: linear-gradient(135deg, #ff4d4d, #b30000); }
+
+.app-topbar { display: flex; align-items: center; gap: 10px; padding: 10px 4px 14px; font-weight: 700; font-size: 14px; }
+.back-btn, .back-btn-thread { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--glass-border); background: var(--glass-light); color: white; cursor: pointer; }
+
+.conv-list { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+.conv-item { background: var(--glass-light); border: 1px solid var(--glass-border); border-radius: 12px; padding: 10px 12px; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.conv-item .del { color: rgba(255,100,100,0.8); font-size: 11px; }
+
+.thread-messages { display: flex; flex-direction: column; gap: 6px; padding: 0 4px; height: 400px; overflow-y: auto; }
+.msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 12px; }
+.msg-bubble.mine { align-self: flex-end; background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple)); }
+.msg-bubble.theirs { align-self: flex-start; background: var(--glass-light); border: 1px solid var(--glass-border); }
+
+.thread-input { display: flex; gap: 8px; margin-top: 10px; padding: 0 4px; }
+.thread-input input { flex: 1; background: var(--glass-light); border: 1px solid var(--glass-border); border-radius: 10px; padding: 8px 10px; color: white; font-size: 12px; outline: none; }
+.thread-input button { border: none; border-radius: 10px; background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple)); color: white; padding: 0 14px; cursor: pointer; }
+
+.add-contact { display: flex; gap: 6px; margin-top: 12px; padding: 0 4px; }
+.add-contact input { flex: 1; background: var(--glass-light); border: 1px solid var(--glass-border); border-radius: 10px; padding: 8px; color: white; font-size: 12px; outline: none; }
+.add-contact button { border: none; border-radius: 10px; background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple)); color: white; width: 34px; cursor: pointer; font-weight: 700; }
+
+.emergency-body { display: flex; flex-direction: column; gap: 12px; padding: 4px; }
+.emergency-body textarea { height: 120px; background: var(--glass-light); border: 1px solid var(--glass-border); border-radius: 10px; padding: 10px; color: white; font-size: 13px; resize: none; outline: none; }
+.btn-sos { border: none; border-radius: 12px; background: linear-gradient(90deg, #ff4d4d, #b30000); color: white; font-weight: 800; padding: 14px; cursor: pointer; font-size: 13px; }
+
+.screen::-webkit-scrollbar, .thread-messages::-webkit-scrollbar { width: 4px; }
+.screen::-webkit-scrollbar-thumb, .thread-messages::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 4px; }

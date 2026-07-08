@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;600;700&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: 'Inter', sans-serif; color: #fff; }
+.hidden { display: none !important; }
+:root { --neon-blue: #2de1ff; --neon-pink: #ff2d95; --neon-purple: #8b2dff; --glass: rgba(10,10,22,0.85); --glass-light: rgba(255,255,255,0.06); --glass-border: rgba(255,255,255,0.14); }
+
+#app { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); }
+.card { width: 320px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; padding: 18px; backdrop-filter: blur(18px); }
+.header { display: flex; justify-content: space-between; align-items: center; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+.close-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--glass-border); background: var(--glass-light); color: white; cursor: pointer; }
+.price { color: var(--neon-blue); font-weight: 700; margin-bottom: 14px; }
+.actions { display: flex; flex-direction: column; gap: 8px; }
+.btn { border: none; border-radius: 10px; padding: 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+.btn-buy { background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple)); color: white; }
+.btn-stash { background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple)); color: white; }
+.btn-sell { background: rgba(255,45,45,0.2); border: 1px solid #ff4d4d; color: #ff9d9d; }

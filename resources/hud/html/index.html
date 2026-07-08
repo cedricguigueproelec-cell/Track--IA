@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>HUD</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="hud" class="hidden">
+    <!-- top right: money -->
+    <div class="money-panel">
+      <div class="money-row"><span class="money-icon cash">$</span><span id="cash-val">0</span></div>
+      <div class="money-row"><span class="money-icon bank">B</span><span id="bank-val">0</span></div>
+    </div>
+
+    <!-- bottom left: vital rings -->
+    <div class="vitals">
+      <div class="ring-wrap" data-stat="health">
+        <svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="19"></circle><circle class="ring-fg ring-health" cx="22" cy="22" r="19"></circle></svg>
+        <span class="ring-icon">♥</span>
+      </div>
+      <div class="ring-wrap" data-stat="armor">
+        <svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="19"></circle><circle class="ring-fg ring-armor" cx="22" cy="22" r="19"></circle></svg>
+        <span class="ring-icon">◆</span>
+      </div>
+      <div class="ring-wrap" data-stat="hunger">
+        <svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="19"></circle><circle class="ring-fg ring-hunger" cx="22" cy="22" r="19"></circle></svg>
+        <span class="ring-icon">🍖</span>
+      </div>
+      <div class="ring-wrap" data-stat="thirst">
+        <svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="19"></circle><circle class="ring-fg ring-thirst" cx="22" cy="22" r="19"></circle></svg>
+        <span class="ring-icon">💧</span>
+      </div>
+      <div class="ring-wrap" data-stat="stamina">
+        <svg viewBox="0 0 44 44"><circle class="ring-bg" cx="22" cy="22" r="19"></circle><circle class="ring-fg ring-stamina" cx="22" cy="22" r="19"></circle></svg>
+        <span class="ring-icon">⚡</span>
+      </div>
+    </div>
+
+    <div id="voice-indicator" class="voice-indicator hidden">🎤</div>
+
+    <!-- bottom center: vehicle HUD -->
+    <div id="vehicle-hud" class="vehicle-hud hidden">
+      <div class="speed"><span id="speed-val">0</span><span class="speed-unit">km/h</span></div>
+      <div class="veh-meta">
+        <div class="fuel-bar"><div id="fuel-fill" class="fuel-fill"></div></div>
+        <div class="gear">Vitesse <span id="gear-val">1</span></div>
+        <div id="belt-indicator" class="belt-indicator">CEINTURE</div>
+      </div>
+    </div>
+
+    <!-- top right: toast notifications -->
+    <div id="toasts" class="toasts"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

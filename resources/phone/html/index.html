@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Téléphone</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="phone" class="hidden">
+    <div class="device">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span id="clock">--:--</span>
+        <span class="statusbar-icons">📶 🔋</span>
+      </div>
+
+      <div id="screen-home" class="screen">
+        <div class="home-header">
+          <div class="home-name" id="home-name">—</div>
+          <div class="home-number" id="home-number">—</div>
+        </div>
+        <div class="apps-grid">
+          <div class="app" data-app="messages"><div class="app-icon msg">💬</div><span>Messages</span></div>
+          <div class="app" data-app="contacts"><div class="app-icon contact">👤</div><span>Contacts</span></div>
+          <div class="app" data-app="bank"><div class="app-icon bank">🏦</div><span>Banque</span></div>
+          <div class="app" data-app="emergency"><div class="app-icon sos">🚨</div><span>Urgences</span></div>
+        </div>
+      </div>
+
+      <div id="screen-messages" class="screen hidden">
+        <div class="app-topbar"><button class="back-btn">←</button><span>Messages</span></div>
+        <div id="conversation-list" class="conv-list"></div>
+      </div>
+
+      <div id="screen-thread" class="screen hidden">
+        <div class="app-topbar"><button class="back-btn-thread">←</button><span id="thread-title">—</span></div>
+        <div id="thread-messages" class="thread-messages"></div>
+        <div class="thread-input">
+          <input id="thread-input-field" placeholder="Message...">
+          <button id="thread-send">➤</button>
+        </div>
+      </div>
+
+      <div id="screen-contacts" class="screen hidden">
+        <div class="app-topbar"><button class="back-btn">←</button><span>Contacts</span></div>
+        <div id="contacts-list" class="conv-list"></div>
+        <div class="add-contact">
+          <input id="new-contact-name" placeholder="Nom">
+          <input id="new-contact-number" placeholder="Numéro">
+          <button id="add-contact-btn">+</button>
+        </div>
+      </div>
+
+      <div id="screen-emergency" class="screen hidden">
+        <div class="app-topbar"><button class="back-btn">←</button><span>Urgences — 911</span></div>
+        <div class="emergency-body">
+          <textarea id="emergency-message" placeholder="Décrivez votre urgence..."></textarea>
+          <button id="emergency-send" class="btn-sos">Appeler la police</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

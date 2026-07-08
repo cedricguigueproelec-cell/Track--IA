@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Banque</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="hidden">
+    <div class="card bank-card">
+      <div class="card-top">
+        <span class="bank-name">TRACK‑IA BANK</span>
+        <span class="chip"></span>
+      </div>
+      <div class="iban" id="iban">TIA000000</div>
+      <div class="balances">
+        <div class="balance"><span class="label">Liquide</span><span id="cash-val" class="value">0 $</span></div>
+        <div class="balance"><span class="label">Banque</span><span id="bank-val" class="value">0 $</span></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="deposit">Déposer</button>
+      <button class="tab" data-tab="withdraw">Retirer</button>
+      <button class="tab" data-tab="transfer">Virement</button>
+      <button class="tab" data-tab="history">Historique</button>
+    </div>
+
+    <div class="panel">
+      <div id="tab-deposit" class="tab-panel">
+        <label>Montant à déposer</label>
+        <input id="deposit-amount" type="number" min="1" placeholder="0">
+        <button class="btn btn-primary" id="deposit-btn">Déposer</button>
+      </div>
+
+      <div id="tab-withdraw" class="tab-panel hidden">
+        <label>Montant à retirer</label>
+        <input id="withdraw-amount" type="number" min="1" placeholder="0">
+        <button class="btn btn-primary" id="withdraw-btn">Retirer</button>
+      </div>
+
+      <div id="tab-transfer" class="tab-panel hidden">
+        <label>Numéro de téléphone du destinataire</label>
+        <input id="transfer-phone" type="text" placeholder="555XXXXXXX">
+        <label>Montant</label>
+        <input id="transfer-amount" type="number" min="1" placeholder="0">
+        <button class="btn btn-primary" id="transfer-btn">Envoyer</button>
+      </div>
+
+      <div id="tab-history" class="tab-panel hidden">
+        <div id="history-list" class="history-list"></div>
+      </div>
+    </div>
+
+    <button id="close-btn" class="close-btn">✕</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
