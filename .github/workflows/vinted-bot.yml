@@ -2,7 +2,8 @@ name: Bot alertes Vinted
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # 5 minutes = le minimum permis par GitHub pour un cron programmé.
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -15,6 +16,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 

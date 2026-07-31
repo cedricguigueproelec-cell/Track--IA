@@ -51,8 +51,12 @@ cp config.example.yaml config.yaml
 ```
 DISCORD_WEBHOOK_URL=<collez l'URL copiée à l'étape 1>
 VINTED_DOMAIN=vinted.fr
-CHECK_INTERVAL_SECONDS=300
+CHECK_INTERVAL_SECONDS=20
 ```
+
+Le bot fait **une seule requête Vinted par cycle**, quel que soit le nombre
+de marques suivies (elles sont toutes vérifiées en même temps). C'est ce
+qui permet un intervalle aussi court sans multiplier les appels à l'API.
 
 Éditez `config.yaml` pour lister les marques à suivre et le prix max par
 marque (les marques non listées ne sont jamais recherchées) :
@@ -108,6 +112,10 @@ les notifier (sinon vous recevriez des centaines de messages d'un coup).
 À partir du deuxième passage, chaque nouvelle annonce détectée est postée
 dans le salon Discord configuré.
 
+Tout est aussi écrit dans `bot.log` (à côté de `bot.py`), en plus de la
+console — pratique pour relire ce qui s'est passé après une absence sans
+avoir eu besoin de laisser la fenêtre ouverte sous les yeux.
+
 Arrêt : `Ctrl+C`.
 
 ## 6. Le faire tourner en continu
@@ -151,23 +159,24 @@ python bot.py
 # Détacher : Ctrl+B puis D. Rattacher plus tard : tmux attach -t vinted-bot
 ```
 
-### Windows — Planificateur de tâches
+### Windows — relance automatique + Planificateur de tâches
 
-1. Créez un fichier `run.bat` dans le dossier du bot :
-   ```bat
-   cd /d %~dp0
-   venv\Scripts\python.exe bot.py
-   ```
-2. Ouvrez le **Planificateur de tâches** → **Créer une tâche** → déclencheur
-   "Au démarrage de l'ordinateur" → action "Démarrer un programme" →
-   pointez vers `run.bat`.
+Le dossier contient déjà `run-forever.bat` : il relance le bot tout seul
+s'il plante ou s'arrête, sans intervention (contrairement à un lancement
+direct de `bot.py`, qui s'arrête définitivement en cas de crash imprévu).
+
+1. Double-cliquez sur `run-forever.bat` pour le lancer manuellement, ou :
+2. Pour qu'il démarre automatiquement avec Windows : **Planificateur de
+   tâches** → **Créer une tâche** → déclencheur "Au démarrage de
+   l'ordinateur" → action "Démarrer un programme" → pointez vers
+   `run-forever.bat`.
 
 ## 7. Alternative gratuite : GitHub Actions (tourne même PC éteint)
 
 Le dépôt contient un workflow (`.github/workflows/vinted-bot.yml`) qui fait
-tourner le bot **gratuitement, sur les serveurs de GitHub**, toutes les 15
-minutes, sans que votre PC ait besoin d'être allumé. Une seule étape est
-nécessaire :
+tourner le bot **gratuitement, sur les serveurs de GitHub**, toutes les 5
+minutes (le minimum permis par GitHub), sans que votre PC ait besoin d'être
+allumé. Une seule étape est nécessaire :
 
 1. Sur GitHub, allez dans votre dépôt → **Settings** → **Secrets and
    variables** → **Actions** → **New repository secret**
@@ -176,7 +185,7 @@ nécessaire :
 3. **Secret** : collez votre URL de webhook Discord.
 4. Cliquez **Add secret**.
 
-C'est tout. Le workflow se déclenche automatiquement toutes les 15 minutes
+C'est tout. Le workflow se déclenche automatiquement toutes les 5 minutes
 (vérifiable dans l'onglet **Actions** du dépôt). Il utilise le
 `config.yaml` du dépôt (donc modifiez-le et poussez sur la branche par
 défaut pour changer les marques suivies) et sauvegarde l'état des annonces
@@ -195,25 +204,62 @@ déjà vues directement dans le dépôt entre deux exécutions.
 - Vous pouvez aussi déclencher une exécution manuelle immédiate : onglet
   **Actions** → **Bot alertes Vinted** → **Run workflow**.
 
+## Robustesse (pensé pour tourner sans surveillance)
+
+- **Le bot ne s'arrête jamais tout seul** : toute erreur inattendue dans un
+  cycle est journalisée puis ignorée, la boucle continue.
+- **Repli automatique en cas d'échecs répétés** : si plusieurs cycles de
+  suite échouent (ex: blocage anti-bot temporaire), l'intervalle entre les
+  tentatives augmente progressivement (jusqu'à 5 min) le temps que ça se
+  tasse, au lieu d'insister et de risquer un blocage plus long.
+- **Reprise au démarrage** : si le réseau n'est pas encore prêt (ex: juste
+  après le démarrage du PC), le bot réessaie plusieurs fois avant
+  d'abandonner.
+- **Logs persistants** : tout est écrit dans `bot.log` (rotation
+  automatique, pas de fichier qui grossit indéfiniment), en plus de la
+  console.
+- **Auto-relance locale** : `run-forever.bat` (Windows) et l'unité systemd
+  (Linux, `Restart=on-failure`) redémarrent le bot s'il plante.
+- **Filet gratuit indépendant de votre PC** : le workflow GitHub Actions
+  (section 7) tourne de son côté, même si votre machine est éteinte ou en
+  vacances avec vous.
+
+## Avant de partir : checklist en 3 points
+
+1. **Vérifiez qu'aucune marque n'a de correspondance approximative** :
+   lancez `python bot.py --once` et regardez les lignes `Marque résolue`
+   dans `bot.log` ou la console. Une ligne `WARNING` signifie que le nom
+   dans `config.yaml` ne correspond pas exactement à une marque Vinted (le
+   bot utilise alors la meilleure approximation trouvée, ce qui peut être
+   faux). Corrigez l'orthographe si besoin.
+2. **Testez le webhook** : `python bot.py --force-notify` doit poster un
+   message par marque dans Discord.
+3. **Confirmez que GitHub Actions tourne** : onglet **Actions** du dépôt,
+   au moins une exécution récente en ✅ vert. C'est ce filet-là qui continue
+   de veiller même si votre PC est éteint pendant votre absence.
+
 ## Personnalisation
 
-- **Ajouter/retirer une marque** : éditez `config.yaml`, relancez le bot.
+- **Ajouter/retirer une marque** : éditez `config.yaml`, relancez le bot
+  (et poussez sur la branche par défaut si vous utilisez GitHub Actions).
 - **Changer le pays Vinted** : `VINTED_DOMAIN` dans `.env` (`vinted.fr`,
   `vinted.de`, `vinted.be`, `vinted.it`, `vinted.es`...).
-- **Vérifier plus/moins souvent** : `CHECK_INTERVAL_SECONDS` — évitez de
-  descendre sous 120s pour ne pas déclencher la protection anti-bot de
-  Vinted.
+- **Vérifier plus/moins souvent** : `CHECK_INTERVAL_SECONDS` dans `.env`
+  (défaut : 20s). Si vous voyez des erreurs 403 répétées dans les logs,
+  remontez cette valeur.
 - **Réinitialiser l'historique** (renvoyer toutes les annonces comme
   "nouvelles") : supprimez `seen_items.json` puis relancez.
 
 ## Dépannage
 
 - **Erreur 401/403 en boucle** : Vinted a probablement renforcé sa
-  protection anti-bot pour votre IP. Attendez quelques minutes,
-  augmentez `CHECK_INTERVAL_SECONDS`, ou changez de réseau.
+  protection anti-bot pour votre IP. Le bot espace déjà automatiquement ses
+  tentatives dans ce cas ; si ça persiste plusieurs heures, augmentez
+  `CHECK_INTERVAL_SECONDS` ou changez de réseau.
 - **Aucune alerte ne part** : vérifiez que `DISCORD_WEBHOOK_URL` est bien
-  collée en entier dans `.env`, et que le webhook n'a pas été supprimé côté
-  Discord (Paramètres du salon → Intégrations → Webhooks).
-- **"Marque introuvable sur Vinted"** dans les logs : vérifiez l'orthographe
-  exacte du nom dans `config.yaml` (celui affiché sur le filtre marque de
-  Vinted).
+  collée en entier dans `.env` (ou dans le secret GitHub), et que le
+  webhook n'a pas été supprimé côté Discord (Paramètres du salon →
+  Intégrations → Webhooks).
+- **"Marque introuvable sur Vinted"** ou **correspondance approximative**
+  dans les logs : vérifiez l'orthographe exacte du nom dans `config.yaml`
+  (celui affiché sur le filtre marque de Vinted).

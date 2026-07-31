@@ -3,9 +3,14 @@
 # marques suivies. Seules les marques listées ici sont surveillées : les
 # marques "fast fashion" (Shein, Kiabi, etc.) ne sont donc jamais remontées,
 # puisqu'elles ne sont simplement pas dans la liste.
+#
+# Après chaque modification, relancez le bot une fois et regardez les
+# lignes "Marque résolue: ..." dans les logs : si une marque affiche un
+# WARNING de correspondance approximative, corrigez son nom ici pour qu'il
+# colle exactement à celui utilisé sur Vinted.
 
 # Prix maximum par défaut (en EUR) si une marque ne précise pas le sien.
-default_max_price: 20
+default_max_price: 25
 
 brands:
   - name: "Ralph Lauren"
@@ -20,3 +25,47 @@ brands:
     max_price: 20
   - name: "The North Face"
     max_price: 30
+  - name: "Carhartt"
+    max_price: 30
+  - name: "Maje"
+    max_price: 25
+  - name: "Maison Margiela"
+    max_price: 60
+  - name: "ARTE Antwerp"
+    max_price: 20
+  - name: "Sandro"
+    max_price: 25
+  - name: "Ba&sh"
+    max_price: 25
+  - name: "Comme des Garçons"
+    max_price: 40
+  - name: "Stone Island"
+    max_price: 50
+  - name: "Burberry"
+    max_price: 50
+  - name: "Calvin Klein"
+    max_price: 20
+  - name: "Levi's"
+    max_price: 20
+  - name: "New Balance"
+    max_price: 20
+  - name: "Vans"
+    max_price: 15
+  - name: "Champion"
+    max_price: 15
+  - name: "Fred Perry"
+    max_price: 20
+  - name: "Kenzo"
+    max_price: 35
+  - name: "Acne Studios"
+    max_price: 40
+  - name: "Ami Paris"
+    max_price: 40
+  - name: "Off-White"
+    max_price: 60
+  - name: "A.P.C."
+    max_price: 35
+  - name: "Barbour"
+    max_price: 30
+  - name: "Aigle"
+    max_price: 25

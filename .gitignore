@@ -13,4 +13,5 @@ server.local.cfg
 # the GitHub Actions workflow to run 24/7 for free) - never commit secrets.
 vinted-discord-bot/venv/
 vinted-discord-bot/__pycache__/
+vinted-discord-bot/bot.log*
 *.pyc

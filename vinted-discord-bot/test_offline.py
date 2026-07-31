@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import bot
 from discord_notifier import DiscordNotifier
 from state import SeenItemsStore
 from vinted_client import VintedClient
@@ -51,10 +52,62 @@ def test_search_new_items_params():
 
     assert items == [{"id": 1, "title": "Polo Ralph Lauren"}]
     params = mock_get.call_args.kwargs["params"]
-    assert params["brand_ids[]"] == 53
+    assert params["brand_ids[]"] == [53]
     assert params["price_to"] == 20
     assert params["order"] == "newest_first"
     print("OK: search_new_items construit les bons paramètres de requête")
+
+
+def test_search_items_for_brands_multi():
+    with patch.object(VintedClient, "_warm_up", return_value=None):
+        client = VintedClient(domain="vinted.fr")
+
+    fake_response = MagicMock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = {"items": [{"id": 1}, {"id": 2}]}
+    fake_response.raise_for_status.return_value = None
+
+    with patch.object(client.session, "get", return_value=fake_response) as mock_get:
+        items = client.search_items_for_brands([53, 304, 88], price_to=25)
+
+    assert len(items) == 2
+    params = mock_get.call_args.kwargs["params"]
+    assert params["brand_ids[]"] == [53, 304, 88]
+    assert params["price_to"] == 25
+    print("OK: search_items_for_brands regroupe plusieurs marques en une requête")
+
+
+def test_run_cycle_dispatches_by_brand_and_filters_price():
+    brand_info = {
+        "Nike": {"id": 53, "title": "Nike"},
+        "Lacoste": {"id": 304, "title": "Lacoste"},
+    }
+    brands_config = [
+        {"name": "Nike", "max_price": 20},
+        {"name": "Lacoste", "max_price": 15},
+    ]
+    title_lookup = bot.build_title_lookup(brand_info, brands_config, default_max_price=None)
+
+    items = [
+        {"id": 1, "brand_title": "Nike", "price": {"amount": "18", "currency_code": "EUR"}, "title": "Nike OK"},
+        {"id": 2, "brand_title": "Nike", "price": {"amount": "45", "currency_code": "EUR"}, "title": "Nike trop cher"},
+        {"id": 3, "brand_title": "Lacoste", "price": {"amount": "10", "currency_code": "EUR"}, "title": "Lacoste OK"},
+        {"id": 4, "brand_title": "Shein", "price": {"amount": "5", "currency_code": "EUR"}, "title": "Marque non suivie"},
+    ]
+
+    client = MagicMock()
+    client.search_items_for_brands.return_value = items
+    client.base_url = "https://www.vinted.fr"
+
+    notifier = MagicMock()
+    store = SeenItemsStore(str(Path(tempfile.mkdtemp()) / "seen.json"))
+
+    bot.run_cycle(client, notifier, store, brand_info, title_lookup, overall_price_to=20, notify=True)
+
+    sent_titles = {call.args[0].get("title") for call in notifier.send_item.call_args_list}
+    assert sent_titles == {"Nike OK", "Lacoste OK"}, sent_titles
+    assert store.is_seen(1) and store.is_seen(2) and store.is_seen(3) and not store.is_seen(4)
+    print("OK: run_cycle envoie seulement les bonnes marques sous leur prix max")
 
 
 def test_discord_notifier_payload():
@@ -104,6 +157,8 @@ def test_seen_items_store_roundtrip():
 if __name__ == "__main__":
     test_resolve_brand_id()
     test_search_new_items_params()
+    test_search_items_for_brands_multi()
+    test_run_cycle_dispatches_by_brand_and_filters_price()
     test_discord_notifier_payload()
     test_seen_items_store_roundtrip()
     print("\nTous les tests hors-ligne sont passés.")

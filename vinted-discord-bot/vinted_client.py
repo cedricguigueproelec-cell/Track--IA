@@ -53,8 +53,8 @@ class VintedClient:
         resp.raise_for_status()
         time.sleep(1)
 
-    def resolve_brand_id(self, brand_name: str) -> Optional[int]:
-        """Retrouve l'identifiant interne Vinted d'une marque à partir de son nom."""
+    def resolve_brand(self, brand_name: str) -> Optional[dict]:
+        """Retrouve {'id':, 'title':} d'une marque Vinted à partir de son nom."""
         brands = self._get_json(
             f"{self.api_url}/brands", params={"search_text": brand_name}
         ).get("brands", [])
@@ -66,7 +66,7 @@ class VintedClient:
 
         for brand in brands:
             if brand.get("title", "").strip().lower() == needle:
-                return brand.get("id")
+                return {"id": brand.get("id"), "title": brand.get("title")}
 
         for brand in brands:
             title = brand.get("title", "").strip().lower()
@@ -78,7 +78,7 @@ class VintedClient:
                     brand.get("title"),
                     brand.get("id"),
                 )
-                return brand.get("id")
+                return {"id": brand.get("id"), "title": brand.get("title")}
 
         best = brands[0]
         logger.warning(
@@ -89,7 +89,12 @@ class VintedClient:
             best.get("title"),
             best.get("id"),
         )
-        return best.get("id")
+        return {"id": best.get("id"), "title": best.get("title")}
+
+    def resolve_brand_id(self, brand_name: str) -> Optional[int]:
+        """Retrouve l'identifiant interne Vinted d'une marque à partir de son nom."""
+        brand = self.resolve_brand(brand_name)
+        return brand["id"] if brand else None
 
     def search_new_items(
         self,
@@ -97,8 +102,18 @@ class VintedClient:
         price_to: Optional[float] = None,
         per_page: int = 20,
     ) -> list:
+        return self.search_items_for_brands([brand_id], price_to=price_to, per_page=per_page)
+
+    def search_items_for_brands(
+        self,
+        brand_ids: list,
+        price_to: Optional[float] = None,
+        per_page: int = 96,
+    ) -> list:
+        """Une seule requête couvrant plusieurs marques à la fois (rapide, peu
+        de requêtes = moins de risque de blocage anti-bot)."""
         params = {
-            "brand_ids[]": brand_id,
+            "brand_ids[]": brand_ids,
             "order": "newest_first",
             "per_page": per_page,
         }
