@@ -1,0 +1,21 @@
+# Copiez ce fichier en "config.yaml" puis ajustez la liste selon vos envies.
+# Seules les marques listées ici sont surveillées : les marques "fast fashion"
+# (Shein, Kiabi, etc.) ne sont donc jamais remontées, puisqu'elles ne sont
+# simplement pas dans la liste.
+
+# Prix maximum par défaut (en EUR) si une marque ne précise pas le sien.
+default_max_price: 20
+
+brands:
+  - name: "Ralph Lauren"
+    max_price: 25
+  - name: "Lacoste"
+    max_price: 20
+  - name: "Nike"
+    max_price: 20
+  - name: "Adidas"
+    max_price: 20
+  - name: "Tommy Hilfiger"
+    max_price: 20
+  - name: "The North Face"
+    max_price: 30

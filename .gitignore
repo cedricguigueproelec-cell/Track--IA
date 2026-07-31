@@ -8,3 +8,10 @@ Thumbs.db
 # Do not commit real secrets if you copy server.cfg to a variant file
 server.local.cfg
 *.env
+
+# Vinted Discord bot: local config/state/venv, never commit secrets or cache
+vinted-discord-bot/config.yaml
+vinted-discord-bot/seen_items.json
+vinted-discord-bot/venv/
+vinted-discord-bot/__pycache__/
+*.pyc
