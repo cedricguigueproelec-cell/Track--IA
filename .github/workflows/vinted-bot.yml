@@ -2,8 +2,10 @@ name: Bot alertes Vinted
 
 on:
   schedule:
-    # 5 minutes = le minimum permis par GitHub pour un cron programmé.
-    - cron: "*/5 * * * *"
+    # Toutes les 5 minutes, décalé de 2 min (2,7,12...) pour éviter le
+    # "pile à l'heure" (:00), un créneau plus chargé où GitHub retarde ou
+    # abandonne parfois les crons programmés.
+    - cron: "2-59/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
