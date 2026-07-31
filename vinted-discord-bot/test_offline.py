@@ -209,6 +209,27 @@ def test_seen_items_store_roundtrip():
     print("OK: SeenItemsStore persiste et recharge correctement")
 
 
+def test_seen_items_store_is_empty_reflects_prior_runs():
+    """is_empty() doit refléter l'état chargé du disque, pas le fait que le
+    processus vient de démarrer : c'est ce qui permet à bot.py de savoir si
+    c'est vraiment le tout premier lancement (pas de notification, pour
+    éviter un flood) ou une relance normale (notifier dès le 1er cycle) -
+    important pour GitHub Actions, qui relance un processus neuf à chaque
+    exécution et n'aurait donc jamais aucune vraie alerte sans ça."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "seen.json"
+
+        fresh_store = SeenItemsStore(str(path))
+        assert fresh_store.is_empty(), "un tout premier lancement doit être détecté comme vide"
+
+        fresh_store.mark_seen(1)
+        fresh_store.save()
+
+        restarted_store = SeenItemsStore(str(path))
+        assert not restarted_store.is_empty(), "un état déjà existant ne doit pas repasser à vide au redémarrage"
+    print("OK: SeenItemsStore.is_empty() distingue premier lancement et redémarrage")
+
+
 if __name__ == "__main__":
     test_resolve_brand_id()
     test_search_new_items_params()
@@ -218,4 +239,5 @@ if __name__ == "__main__":
     test_run_cycle_matches_by_brand_id_when_title_missing()
     test_discord_notifier_payload()
     test_seen_items_store_roundtrip()
+    test_seen_items_store_is_empty_reflects_prior_runs()
     print("\nTous les tests hors-ligne sont passés.")

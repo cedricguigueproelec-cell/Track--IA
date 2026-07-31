@@ -26,6 +26,9 @@ class SeenItemsStore:
     def is_seen(self, item_id: int) -> bool:
         return item_id in self._ids
 
+    def is_empty(self) -> bool:
+        return not self._ids
+
     def mark_seen(self, item_id: int) -> None:
         self._ids.add(item_id)
 

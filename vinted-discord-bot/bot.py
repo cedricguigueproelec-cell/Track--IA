@@ -387,7 +387,17 @@ def main() -> None:
         check_interval,
     )
 
-    first_pass = True
+    # "Premier passage" = seen_items.json était vide au chargement (vraiment
+    # jamais lancé avant), pas "ce processus vient de démarrer" : sinon,
+    # comme GitHub Actions relance un processus tout neuf à chaque exécution
+    # (`--once`), first_pass serait toujours vrai et aucune alerte ne
+    # partirait jamais en continu, seulement au tout premier essai global.
+    first_pass = store.is_empty()
+    if first_pass:
+        logger.info(
+            "Aucun historique existant : ce premier passage indexe les annonces "
+            "actuelles sans notifier, pour éviter un flood au démarrage."
+        )
     consecutive_failures = 0
     last_brand_retry = time.monotonic()
     unresolved_count = len(brands_config) - len(brand_info)
