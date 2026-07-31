@@ -162,6 +162,39 @@ python bot.py
    "Au démarrage de l'ordinateur" → action "Démarrer un programme" →
    pointez vers `run.bat`.
 
+## 7. Alternative gratuite : GitHub Actions (tourne même PC éteint)
+
+Le dépôt contient un workflow (`.github/workflows/vinted-bot.yml`) qui fait
+tourner le bot **gratuitement, sur les serveurs de GitHub**, toutes les 15
+minutes, sans que votre PC ait besoin d'être allumé. Une seule étape est
+nécessaire :
+
+1. Sur GitHub, allez dans votre dépôt → **Settings** → **Secrets and
+   variables** → **Actions** → **New repository secret**
+   (ou directement via l'URL `https://github.com/<votre-repo>/settings/secrets/actions/new`).
+2. **Name** : `DISCORD_WEBHOOK_URL`
+3. **Secret** : collez votre URL de webhook Discord.
+4. Cliquez **Add secret**.
+
+C'est tout. Le workflow se déclenche automatiquement toutes les 15 minutes
+(vérifiable dans l'onglet **Actions** du dépôt). Il utilise le
+`config.yaml` du dépôt (donc modifiez-le et poussez sur la branche par
+défaut pour changer les marques suivies) et sauvegarde l'état des annonces
+déjà vues directement dans le dépôt entre deux exécutions.
+
+⚠️ Limites à connaître :
+- GitHub peut retarder légèrement les exécutions programmées en cas de forte
+  charge (rarement plus de quelques minutes).
+- Si le dépôt reste 60 jours sans aucune activité (aucun push), GitHub
+  désactive automatiquement les workflows programmés — il suffit alors
+  d'aller dans l'onglet **Actions** et de cliquer sur **"Enable workflow"**.
+- Les serveurs GitHub utilisent des IP de datacenter, que Vinted peut
+  bloquer plus facilement qu'une IP résidentielle. Si les exécutions
+  échouent en boucle avec des erreurs 403, l'option "faire tourner sur mon
+  PC/Raspberry Pi" reste la plus fiable.
+- Vous pouvez aussi déclencher une exécution manuelle immédiate : onglet
+  **Actions** → **Bot alertes Vinted** → **Run workflow**.
+
 ## Personnalisation
 
 - **Ajouter/retirer une marque** : éditez `config.yaml`, relancez le bot.
