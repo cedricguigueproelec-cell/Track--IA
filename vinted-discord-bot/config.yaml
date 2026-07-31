@@ -8,6 +8,17 @@
 # lignes "Marque résolue: ..." dans les logs : si une marque affiche un
 # WARNING de correspondance approximative, corrigez son nom ici pour qu'il
 # colle exactement à celui utilisé sur Vinted.
+#
+# Une marque résolue avec succès est mise en cache dans brand_cache.json et
+# n'est plus jamais redemandée à Vinted. Si une marque reste bloquée malgré
+# plusieurs cycles (Vinted limite les recherches de marque), vous pouvez lui
+# donner son id Vinted directement, sans passer par la recherche :
+#
+#   - name: "The North Face"
+#     id: 12345          # trouvé en filtrant par marque sur vinted.fr et en
+#                         # lisant l'URL (?brand_ids[]=12345)
+#     title: "The North Face"   # optionnel, sert juste à l'affichage
+#     max_price: 30
 
 # Prix maximum par défaut (en EUR) si une marque ne précise pas le sien.
 default_max_price: 25

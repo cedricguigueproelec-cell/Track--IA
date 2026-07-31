@@ -74,7 +74,22 @@ brands:
 ```
 
 Le nom doit correspondre au nom de la marque tel qu'il apparaît sur Vinted
-(le bot fait une recherche et prend la meilleure correspondance).
+(le bot fait une recherche et prend la meilleure correspondance). Une
+marque résolue avec succès est **mise en cache définitivement**
+(`brand_cache.json`) : elle n'est plus jamais redemandée à Vinted, même
+après un redémarrage. Si une marque refuse de se résoudre correctement
+(Vinted limite les recherches de marque après quelques requêtes), vous
+pouvez lui donner directement son id Vinted pour court-circuiter la
+recherche :
+
+```yaml
+brands:
+  - name: "The North Face"
+    id: 12345          # trouvé en filtrant par marque sur vinted.fr et en
+                        # lisant l'URL (?brand_ids[]=12345)
+    title: "The North Face"   # optionnel, juste pour l'affichage
+    max_price: 30
+```
 
 ## 4. Tester avant de lancer en continu
 
@@ -208,10 +223,26 @@ déjà vues directement dans le dépôt entre deux exécutions.
 
 - **Le bot ne s'arrête jamais tout seul** : toute erreur inattendue dans un
   cycle est journalisée puis ignorée, la boucle continue.
-- **Repli automatique en cas d'échecs répétés** : si plusieurs cycles de
-  suite échouent (ex: blocage anti-bot temporaire), l'intervalle entre les
-  tentatives augmente progressivement (jusqu'à 5 min) le temps que ça se
-  tasse, au lieu d'insister et de risquer un blocage plus long.
+- **Cache de marques permanent** (`brand_cache.json`) : une marque résolue
+  une fois n'est plus jamais redemandée à Vinted, même après un
+  redémarrage — donc même après chaque exécution GitHub Actions, qui
+  repart pourtant de zéro. Sans ce cache, une longue liste de marques
+  redéclencherait la même limite anti-bot à chaque exécution.
+- **Résolution étalée dans le temps** : une marque pas encore résolue
+  (bloquée, mal orthographiée, ou temporairement limitée par Vinted) est
+  simplement laissée de côté pour ce cycle plutôt que de bloquer le bot
+  avec une longue pause — elle est retentée automatiquement toutes les
+  `BRAND_RETRY_INTERVAL_SECONDS` (5 min par défaut), pendant que la
+  recherche des annonces continue normalement et rapidement pour les
+  marques déjà connues.
+- **Jamais de résultat "leurre" accepté à tort** : si Vinted renvoie une
+  correspondance approximative (`match: fallback`, signe classique d'un
+  faux résultat anti-bot plutôt qu'une vraie erreur), la marque est
+  ignorée pour ce cycle plutôt que mise en cache avec un id probablement
+  faux.
+- **Repli automatique en cas d'échecs répétés** sur la recherche
+  d'annonces : l'intervalle entre les tentatives augmente progressivement
+  (jusqu'à 5 min) après plusieurs échecs de suite, au lieu d'insister.
 - **Reprise au démarrage** : si le réseau n'est pas encore prêt (ex: juste
   après le démarrage du PC), le bot réessaie plusieurs fois avant
   d'abandonner.
@@ -224,19 +255,25 @@ déjà vues directement dans le dépôt entre deux exécutions.
   (section 7) tourne de son côté, même si votre machine est éteinte ou en
   vacances avec vous.
 
-## Avant de partir : checklist en 3 points
+## Avant de partir : checklist en 4 points
 
-1. **Vérifiez qu'aucune marque n'a de correspondance approximative** :
-   lancez `python bot.py --once` et regardez les lignes `Marque résolue`
-   dans `bot.log` ou la console. Une ligne `WARNING` signifie que le nom
-   dans `config.yaml` ne correspond pas exactement à une marque Vinted (le
-   bot utilise alors la meilleure approximation trouvée, ce qui peut être
-   faux). Corrigez l'orthographe si besoin.
-2. **Testez le webhook** : `python bot.py --force-notify` doit poster un
-   message par marque dans Discord.
-3. **Confirmez que GitHub Actions tourne** : onglet **Actions** du dépôt,
+1. **Laissez le cache de marques se remplir** : lancez `python bot.py
+   --once` plusieurs fois à quelques minutes d'intervalle (ou laissez
+   GitHub Actions tourner un moment). Chaque marque encore inconnue affiche
+   soit `Marque résolue et mise en cache` (bon signe, définitif), soit
+   `Résultat non fiable ... ignorée pour ce cycle` (sera retentée plus
+   tard). Vérifiez `brand_cache.json` : une fois qu'il contient toutes vos
+   marques, plus aucune requête de résolution n'est nécessaire.
+2. **Pour une marque qui reste bloquée après plusieurs essais**, donnez-lui
+   directement son id Vinted dans `config.yaml` (voir section 3) plutôt que
+   d'attendre indéfiniment.
+3. **Testez le webhook** : `python bot.py --force-notify` doit poster un
+   message par marque déjà résolue dans Discord.
+4. **Confirmez que GitHub Actions tourne** : onglet **Actions** du dépôt,
    au moins une exécution récente en ✅ vert. C'est ce filet-là qui continue
-   de veiller même si votre PC est éteint pendant votre absence.
+   de veiller même si votre PC est éteint pendant votre absence — pensez à
+   `git pull` en local de temps en temps pour récupérer le cache de marques
+   que GitHub Actions aura complété de son côté.
 
 ## Personnalisation
 
@@ -245,21 +282,37 @@ déjà vues directement dans le dépôt entre deux exécutions.
 - **Changer le pays Vinted** : `VINTED_DOMAIN` dans `.env` (`vinted.fr`,
   `vinted.de`, `vinted.be`, `vinted.it`, `vinted.es`...).
 - **Vérifier plus/moins souvent** : `CHECK_INTERVAL_SECONDS` dans `.env`
-  (défaut : 20s). Si vous voyez des erreurs 403 répétées dans les logs,
-  remontez cette valeur.
+  (défaut : 20s). Ne concerne que la recherche d'annonces (marques déjà
+  résolues) ; si vous voyez des erreurs 403 répétées dans les logs sur la
+  recherche elle-même (pas la résolution de marque), remontez cette valeur.
+- **Changer la fréquence de nouvelle tentative pour les marques bloquées** :
+  `BRAND_RETRY_INTERVAL_SECONDS` dans `.env` (défaut : 300s = 5 min).
 - **Réinitialiser l'historique** (renvoyer toutes les annonces comme
   "nouvelles") : supprimez `seen_items.json` puis relancez.
+- **Forcer une marque à se re-résoudre** (ex: après une correction
+  d'orthographe) : supprimez son entrée dans `brand_cache.json` (ou tout le
+  fichier pour tout re-résoudre) puis relancez.
 
 ## Dépannage
 
-- **Erreur 401/403 en boucle** : Vinted a probablement renforcé sa
-  protection anti-bot pour votre IP. Le bot espace déjà automatiquement ses
-  tentatives dans ce cas ; si ça persiste plusieurs heures, augmentez
-  `CHECK_INTERVAL_SECONDS` ou changez de réseau.
+- **Erreur 401/403 en boucle sur la recherche d'annonces** : Vinted a
+  probablement renforcé sa protection anti-bot pour votre IP. Le bot espace
+  déjà automatiquement ses tentatives dans ce cas ; si ça persiste
+  plusieurs heures, augmentez `CHECK_INTERVAL_SECONDS` ou changez de
+  réseau.
+- **Une marque reste bloquée pendant longtemps** ("Résultat non fiable"
+  répété dans les logs) : c'est le signe que Vinted limite fortement la
+  recherche de marques après quelques requêtes (observé après ~5 marques
+  résolues d'affilée). Le bot réessaie tout seul toutes les 5 minutes sans
+  bloquer le reste, mais si ça persiste plusieurs heures, donnez l'id
+  Vinted de cette marque directement dans `config.yaml` (voir section 3)
+  plutôt que d'attendre.
 - **Aucune alerte ne part** : vérifiez que `DISCORD_WEBHOOK_URL` est bien
   collée en entier dans `.env` (ou dans le secret GitHub), et que le
   webhook n'a pas été supprimé côté Discord (Paramètres du salon →
   Intégrations → Webhooks).
 - **"Marque introuvable sur Vinted"** ou **correspondance approximative**
   dans les logs : vérifiez l'orthographe exacte du nom dans `config.yaml`
-  (celui affiché sur le filtre marque de Vinted).
+  (celui affiché sur le filtre marque de Vinted) — si l'orthographe est
+  correcte, c'est probablement le blocage anti-bot ci-dessus, pas une
+  faute de frappe.

@@ -1,0 +1,9 @@
+{
+  "Ralph Lauren": {"id": 88, "title": "Ralph Lauren"},
+  "Lacoste": {"id": 304, "title": "Lacoste"},
+  "Nike": {"id": 53, "title": "Nike"},
+  "Adidas": {"id": 14, "title": "adidas"},
+  "Tommy Hilfiger": {"id": 94, "title": "Tommy Hilfiger"},
+  "Calvin Klein": {"id": 255, "title": "Calvin Klein"},
+  "Levi's": {"id": 10, "title": "Levi's"}
+}

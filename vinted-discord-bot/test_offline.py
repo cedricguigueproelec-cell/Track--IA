@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import bot
 from discord_notifier import DiscordNotifier
-from state import SeenItemsStore
+from state import BrandCache, SeenItemsStore
 from vinted_client import VintedClient
 
 
@@ -86,7 +86,7 @@ def test_run_cycle_dispatches_by_brand_and_filters_price():
         {"name": "Nike", "max_price": 20},
         {"name": "Lacoste", "max_price": 15},
     ]
-    title_lookup = bot.build_title_lookup(brand_info, brands_config, default_max_price=None)
+    brand_lookup = bot.build_brand_lookup(brand_info, brands_config, default_max_price=None)
 
     items = [
         {"id": 1, "brand_title": "Nike", "price": {"amount": "18", "currency_code": "EUR"}, "title": "Nike OK"},
@@ -102,7 +102,7 @@ def test_run_cycle_dispatches_by_brand_and_filters_price():
     notifier = MagicMock()
     store = SeenItemsStore(str(Path(tempfile.mkdtemp()) / "seen.json"))
 
-    bot.run_cycle(client, notifier, store, brand_info, title_lookup, overall_price_to=20, notify=True)
+    bot.run_cycle(client, notifier, store, brand_info, brand_lookup, overall_price_to=20, notify=True)
 
     sent_titles = {call.args[0].get("title") for call in notifier.send_item.call_args_list}
     assert sent_titles == {"Nike OK", "Lacoste OK"}, sent_titles
@@ -110,31 +110,59 @@ def test_run_cycle_dispatches_by_brand_and_filters_price():
     print("OK: run_cycle envoie seulement les bonnes marques sous leur prix max")
 
 
-def test_resolve_brands_never_trusts_fallback_without_retry():
-    """Un résultat 'fallback' (correspondance non fiable, ex: leurre
-    anti-bot type 'toujours adidas') ne doit jamais être accepté tel quel :
-    le bot doit rafraîchir sa session et réessayer avant de faire
-    confiance, et exclure la marque si le nouvel essai est encore mauvais."""
+def test_run_cycle_matches_by_brand_id_when_title_missing():
+    """Si Vinted ne renvoie pas brand_title mais un id, le matching doit
+    quand même fonctionner (utile pour les marques ajoutées via id: manuel
+    dans config.yaml, sans titre Vinted connu)."""
+    brand_info = {"MaMarque": {"id": 999, "title": "MaMarque"}}
+    brands_config = [{"name": "MaMarque", "max_price": 50}]
+    brand_lookup = bot.build_brand_lookup(brand_info, brands_config, default_max_price=None)
+
+    items = [{"id": 1, "brand_id": 999, "price": {"amount": "10", "currency_code": "EUR"}, "title": "Trouvé par id"}]
+
+    client = MagicMock()
+    client.search_items_for_brands.return_value = items
+    client.base_url = "https://www.vinted.fr"
+    notifier = MagicMock()
+    store = SeenItemsStore(str(Path(tempfile.mkdtemp()) / "seen.json"))
+
+    bot.run_cycle(client, notifier, store, brand_info, brand_lookup, overall_price_to=None, notify=True)
+
+    notifier.send_item.assert_called_once()
+    print("OK: run_cycle reconnaît une marque par id même sans brand_title")
+
+
+def test_resolve_brands_uses_cache_and_manual_override():
+    """Une marque en cache ou avec un id manuel ne doit jamais déclencher
+    d'appel réseau ; une marque avec un résultat 'fallback' (non fiable,
+    ex: leurre anti-bot) doit être laissée de côté pour ce cycle plutôt
+    que d'être acceptée telle quelle."""
     client = MagicMock()
     client.resolve_brand.side_effect = [
         {"id": 1, "title": "Nike", "match": "exact"},
-        {"id": 14, "title": "adidas", "match": "fallback"},  # Introuvable, 1er essai
-        {"id": 14, "title": "adidas", "match": "fallback"},  # Introuvable, réessai -> toujours mauvais
-        {"id": 14, "title": "adidas", "match": "fallback"},  # Carhartt, 1er essai
-        {"id": 77, "title": "Carhartt", "match": "exact"},  # Carhartt, réessai -> bon résultat
+        {"id": 14, "title": "adidas", "match": "fallback"},
+    ]
+
+    cache = BrandCache(str(Path(tempfile.mkdtemp()) / "brand_cache.json"))
+    cache.set("Lacoste", 304, "Lacoste")
+
+    brands_config = [
+        {"name": "Nike"},  # à résoudre en direct
+        {"name": "Lacoste"},  # déjà en cache
+        {"name": "The North Face", "id": 777, "title": "The North Face"},  # override manuel
+        {"name": "Introuvable"},  # renvoie un résultat non fiable
     ]
 
     with patch("bot.time.sleep"):
-        brand_info = bot.resolve_brands(
-            client,
-            [{"name": "Nike"}, {"name": "Introuvable"}, {"name": "Carhartt"}],
-        )
+        brand_info = bot.resolve_brands(client, brands_config, cache)
 
     assert brand_info["Nike"]["id"] == 1
-    assert brand_info["Carhartt"]["id"] == 77, "doit utiliser le résultat du réessai, pas le leurre"
-    assert "Introuvable" not in brand_info, "un résultat resté suspect après réessai ne doit jamais être accepté"
-    assert client.refresh_session.call_count == 2
-    print("OK: resolve_brands ne fait jamais confiance à un résultat 'fallback' sans vérification")
+    assert brand_info["Lacoste"]["id"] == 304
+    assert brand_info["The North Face"]["id"] == 777
+    assert "Introuvable" not in brand_info, "un résultat non fiable ne doit jamais être accepté"
+    assert client.resolve_brand.call_count == 2, "Lacoste (cache) et The North Face (override) ne doivent pas appeler l'API"
+    assert cache.get("Nike") == {"id": 1, "title": "Nike"}, "un succès doit être mis en cache"
+    print("OK: resolve_brands utilise le cache/l'override et ignore les résultats non fiables")
 
 
 def test_discord_notifier_payload():
@@ -185,8 +213,9 @@ if __name__ == "__main__":
     test_resolve_brand_id()
     test_search_new_items_params()
     test_search_items_for_brands_multi()
-    test_resolve_brands_never_trusts_fallback_without_retry()
+    test_resolve_brands_uses_cache_and_manual_override()
     test_run_cycle_dispatches_by_brand_and_filters_price()
+    test_run_cycle_matches_by_brand_id_when_title_missing()
     test_discord_notifier_payload()
     test_seen_items_store_roundtrip()
     print("\nTous les tests hors-ligne sont passés.")

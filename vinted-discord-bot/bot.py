@@ -19,7 +19,7 @@ import yaml
 from dotenv import load_dotenv
 
 from discord_notifier import DiscordNotifier
-from state import SeenItemsStore
+from state import BrandCache, SeenItemsStore
 from vinted_client import VintedClient
 
 logger = logging.getLogger(__name__)
@@ -57,69 +57,91 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def resolve_brands(client: VintedClient, brands_config: list) -> dict:
-    """name -> {'id':, 'title':} pour chaque marque valide de la config.
+def resolve_brands(client: VintedClient, brands_config: list, cache: BrandCache) -> dict:
+    """name -> {'id':, 'title':} pour chaque marque de la config qu'on a pu
+    identifier (via override manuel, cache, ou résolution en direct).
 
-    Vinted répond parfois par un résultat générique/factice (souvent
-    "adidas") au lieu d'une vraie erreur quand il détecte un usage
-    automatisé trop rapide. Un résultat "fallback" (déjà la correspondance
-    la moins fiable en soi) n'est donc JAMAIS accepté directement : on
-    marque une pause, on renouvelle la session, et on réessaie une fois
-    avant de faire confiance au résultat — sinon la marque est ignorée
-    pour ce cycle plutôt que mappée sur une valeur probablement fausse.
+    Trois sources, par ordre de priorité :
+    1. `id:` (+ `title:` optionnel) directement dans config.yaml — aucune
+       requête réseau, utile pour une marque que Vinted refuse de résoudre
+       en recherche (voir le README pour trouver l'id manuellement).
+    2. Le cache disque (`brand_cache.json`) — une marque déjà résolue une
+       fois n'est plus jamais redemandée à Vinted.
+    3. Une recherche en direct sur `/brands`, en cas d'échec ou de résultat
+       peu fiable (`match: fallback`, un signe classique de leurre
+       anti-bot) la marque est simplement laissée de côté pour cette fois :
+       elle sera retentée automatiquement au prochain cycle plutôt que
+       d'insister avec de longues pauses bloquantes.
     """
     brand_info = {}
 
     for brand in brands_config:
         name = brand["name"]
+
+        if brand.get("id") is not None:
+            brand_info[name] = {"id": brand["id"], "title": brand.get("title") or name}
+            continue
+
+        cached = cache.get(name)
+        if cached is not None:
+            brand_info[name] = cached
+            continue
+
         resolved = client.resolve_brand(name)
 
-        if resolved is not None and resolved.get("match") == "fallback":
+        if resolved is None:
+            logger.warning("Marque introuvable sur Vinted, réessai au prochain cycle: %s", name)
+            continue
+
+        if resolved.get("match") == "fallback":
             logger.warning(
                 "Résultat non fiable pour '%s' (correspondance approximative : '%s', "
-                "id %s) — pause et nouvelle tentative avant d'y faire confiance.",
+                "id %s), probablement un leurre anti-bot Vinted : ignorée pour ce "
+                "cycle, sera retentée automatiquement au prochain.",
                 name,
                 resolved.get("title"),
                 resolved.get("id"),
             )
-            time.sleep(15)
-            client.refresh_session()
-            time.sleep(2)
-            retry = client.resolve_brand(name)
-            if retry is not None and retry.get("match") != "fallback":
-                resolved = retry
-            else:
-                logger.error(
-                    "'%s' toujours pas résolue de façon fiable après nouvelle tentative "
-                    "(Vinted bloque probablement les requêtes en ce moment) : marque "
-                    "ignorée pour ce cycle.",
-                    name,
-                )
-                time.sleep(3)
-                continue
-
-        if resolved is None:
-            logger.warning("Marque introuvable sur Vinted, ignorée: %s", name)
             continue
 
-        brand_info[name] = resolved
+        brand_info[name] = {"id": resolved["id"], "title": resolved["title"]}
+        cache.set(name, resolved["id"], resolved["title"])
         logger.info(
-            "Marque résolue: %s -> id %s (%s)", name, resolved["id"], resolved["title"]
+            "Marque résolue et mise en cache: %s -> id %s (%s)",
+            name,
+            resolved["id"],
+            resolved["title"],
         )
         time.sleep(2)
+
     return brand_info
 
 
-def build_title_lookup(brand_info: dict, brands_config: list, default_max_price) -> dict:
-    """titre Vinted (minuscule) -> {'name': nom config, 'max_price':}."""
+def build_brand_lookup(brand_info: dict, brands_config: list, default_max_price):
+    """Retourne (by_id, by_title) : deux dicts id/titre -> {'name':, 'max_price':},
+    pour reconnaître la marque d'une annonce quel que soit le champ que
+    Vinted utilise dans sa réponse (id fiable en priorité, titre en repli)."""
     max_price_by_name = {
         b["name"]: b.get("max_price", default_max_price) for b in brands_config
     }
-    lookup = {}
+    by_id, by_title = {}, {}
     for name, info in brand_info.items():
+        entry = {"name": name, "max_price": max_price_by_name.get(name)}
+        if info.get("id") is not None:
+            by_id[info["id"]] = entry
         title = (info.get("title") or "").strip().lower()
-        lookup[title] = {"name": name, "max_price": max_price_by_name.get(name)}
-    return lookup
+        if title:
+            by_title[title] = entry
+    return by_id, by_title
+
+
+def item_brand_id(item: dict):
+    if item.get("brand_id") is not None:
+        return item["brand_id"]
+    brand = item.get("brand")
+    if isinstance(brand, dict):
+        return brand.get("id")
+    return None
 
 
 def item_brand_title(item: dict) -> str:
@@ -149,13 +171,19 @@ def run_cycle(
     notifier: DiscordNotifier,
     store: SeenItemsStore,
     brand_info: dict,
-    title_lookup: dict,
+    brand_lookup: tuple,
     overall_price_to,
     notify: bool,
 ) -> bool:
     """Retourne False si la recherche Vinted a échoué (utilisé pour le
     repli progressif en cas d'échecs répétés), True sinon."""
+    by_id, by_title = brand_lookup
     all_ids = [info["id"] for info in brand_info.values()]
+
+    if not all_ids:
+        # Aucune marque résolue pour l'instant : rien à chercher ce cycle
+        # (on évite surtout d'envoyer une recherche sans filtre de marque).
+        return True
 
     try:
         items = client.search_items_for_brands(
@@ -170,7 +198,9 @@ def run_cycle(
         if store.is_seen(item["id"]):
             continue
 
-        entry = title_lookup.get(item_brand_title(item).strip().lower())
+        entry = by_id.get(item_brand_id(item)) or by_title.get(
+            item_brand_title(item).strip().lower()
+        )
         if entry is None:
             # Article d'une marque non suivie remonté par erreur : on l'ignore
             # sans le marquer vu, au cas où le filtre serveur ne l'exclurait
@@ -252,8 +282,10 @@ def main() -> None:
     webhook_url = os.environ["DISCORD_WEBHOOK_URL"]
     domain = os.environ.get("VINTED_DOMAIN", "vinted.fr")
     check_interval = int(os.environ.get("CHECK_INTERVAL_SECONDS", "20"))
+    brand_retry_interval = int(os.environ.get("BRAND_RETRY_INTERVAL_SECONDS", "300"))
     config_path = os.environ.get("CONFIG_PATH", "config.yaml")
     state_path = os.environ.get("STATE_PATH", "seen_items.json")
+    brand_cache_path = os.environ.get("BRAND_CACHE_PATH", "brand_cache.json")
     log_path = os.environ.get("LOG_PATH", "bot.log")
 
     setup_logging(log_path)
@@ -265,18 +297,30 @@ def main() -> None:
     client = create_client_with_retry(domain)
     notifier = DiscordNotifier(webhook_url)
     store = SeenItemsStore(state_path)
+    brand_cache = BrandCache(brand_cache_path)
 
-    brand_info = resolve_brands(client, brands_config)
+    def resolve_and_prepare():
+        info = resolve_brands(client, brands_config, brand_cache)
+        brand_cache.save()
+        max_price_by_name = {
+            b["name"]: b.get("max_price", default_max_price) for b in brands_config
+        }
+        prices = [max_price_by_name.get(name) for name in info]
+        price_to = max(prices) if prices and all(p is not None for p in prices) else None
+        return info, build_brand_lookup(info, brands_config, default_max_price), price_to
+
+    brand_info, brand_lookup, overall_price_to = resolve_and_prepare()
     if not brand_info:
-        logger.error("Aucune marque valide dans la config, arrêt du bot.")
-        return
-
-    title_lookup = build_title_lookup(brand_info, brands_config, default_max_price)
-
-    max_prices = [entry["max_price"] for entry in title_lookup.values()]
-    overall_price_to = max(max_prices) if all(p is not None for p in max_prices) else None
+        logger.error(
+            "Aucune marque n'a pu être résolue pour l'instant (Vinted bloque "
+            "probablement les requêtes en ce moment). Le bot va quand même "
+            "démarrer et réessaiera à chaque cycle."
+        )
 
     if args.force_notify:
+        if not brand_info:
+            logger.error("Aucune marque résolue, rien à tester. Réessayez dans quelques minutes.")
+            return
         logger.warning(
             "Mode test --force-notify : envoi d'une annonce existante par marque, "
             "sans marquer d'état (juste pour vérifier le webhook Discord)."
@@ -314,14 +358,26 @@ def main() -> None:
 
     first_pass = True
     consecutive_failures = 0
+    last_brand_retry = time.monotonic()
+    unresolved_count = len(brands_config) - len(brand_info)
     while True:
         try:
+            # On ne retente les marques pas encore résolues qu'à un rythme
+            # espacé (par défaut 5 min), séparé de l'intervalle rapide de
+            # vérification des annonces : ça évite de marteler l'API des
+            # marques (déjà à l'origine du blocage) tout en gardant les
+            # cycles de recherche rapides pour les marques déjà connues.
+            if unresolved_count > 0 and (time.monotonic() - last_brand_retry) >= brand_retry_interval:
+                brand_info, brand_lookup, overall_price_to = resolve_and_prepare()
+                unresolved_count = len(brands_config) - len(brand_info)
+                last_brand_retry = time.monotonic()
+
             success = run_cycle(
                 client,
                 notifier,
                 store,
                 brand_info,
-                title_lookup,
+                brand_lookup,
                 overall_price_to,
                 notify=not first_pass,
             )
