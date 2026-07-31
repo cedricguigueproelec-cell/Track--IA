@@ -275,6 +275,18 @@ déjà vues directement dans le dépôt entre deux exécutions.
    `git pull` en local de temps en temps pour récupérer le cache de marques
    que GitHub Actions aura complété de son côté.
 
+### "error: Your local changes ... would be overwritten by merge"
+
+Normal si vous avez lancé le bot en local avant de faire `git pull` :
+`brand_cache.json`/`seen_items.json` sont réécrits par chaque exécution, ce
+qui crée une modification locale. Comme ce sont des fichiers d'état (pas de
+travail à vous, rien à perdre), écrasez-les sans risque avant de retirer :
+
+```bash
+git checkout -- brand_cache.json seen_items.json
+git pull
+```
+
 ## Personnalisation
 
 - **Ajouter/retirer une marque** : éditez `config.yaml`, relancez le bot
