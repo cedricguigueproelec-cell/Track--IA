@@ -59,10 +59,37 @@ class VintedClient:
             f"{self.api_url}/brands", params={"search_text": brand_name}
         ).get("brands", [])
 
+        if not brands:
+            return None
+
+        needle = brand_name.strip().lower()
+
         for brand in brands:
-            if brand.get("title", "").strip().lower() == brand_name.strip().lower():
+            if brand.get("title", "").strip().lower() == needle:
                 return brand.get("id")
-        return brands[0]["id"] if brands else None
+
+        for brand in brands:
+            title = brand.get("title", "").strip().lower()
+            if needle in title or title in needle:
+                logger.warning(
+                    "Pas de correspondance exacte pour '%s', marque '%s' (id %s) "
+                    "utilisée par correspondance partielle.",
+                    brand_name,
+                    brand.get("title"),
+                    brand.get("id"),
+                )
+                return brand.get("id")
+
+        best = brands[0]
+        logger.warning(
+            "Pas de correspondance pour '%s' : la recherche Vinted n'a rien retourné "
+            "de proche. Marque '%s' (id %s, 1er résultat) utilisée par défaut, ce qui "
+            "est probablement FAUX. Vérifiez l'orthographe exacte dans config.yaml.",
+            brand_name,
+            best.get("title"),
+            best.get("id"),
+        )
+        return best.get("id")
 
     def search_new_items(
         self,
