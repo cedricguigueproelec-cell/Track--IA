@@ -72,7 +72,32 @@ brands:
 Le nom doit correspondre au nom de la marque tel qu'il apparaît sur Vinted
 (le bot fait une recherche et prend la meilleure correspondance).
 
-## 4. Lancer le bot
+## 4. Tester avant de lancer en continu
+
+Trois niveaux de test, du plus sûr au plus complet :
+
+1. **Logique du code, sans réseau ni Discord** (rapide, à faire en premier) :
+   ```bash
+   python test_offline.py
+   ```
+   Doit afficher `Tous les tests hors-ligne sont passés.`
+
+2. **Webhook Discord uniquement** — envoie une annonce réelle et actuelle
+   par marque configurée, pour vérifier que le webhook fonctionne :
+   ```bash
+   python bot.py --force-notify
+   ```
+   Regardez le salon Discord : vous devriez voir un message par marque en
+   quelques secondes. Le script s'arrête tout seul après l'envoi.
+
+3. **Un cycle complet sans notifier** (vérifie la connexion à Vinted, la
+   résolution des marques et la récupération des annonces, sans rien
+   poster dans Discord) :
+   ```bash
+   python bot.py --once
+   ```
+
+## 5. Lancer le bot
 
 ```bash
 python bot.py
@@ -85,7 +110,7 @@ dans le salon Discord configuré.
 
 Arrêt : `Ctrl+C`.
 
-## 5. Le faire tourner en continu
+## 6. Le faire tourner en continu
 
 Le script doit rester lancé pour continuer à surveiller. Quelques options :
 

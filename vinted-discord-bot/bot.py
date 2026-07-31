@@ -5,6 +5,7 @@ salon Discord (via webhook) les nouvelles annonces en dessous du prix max
 défini, dès qu'elles apparaissent sur Vinted.
 """
 
+import argparse
 import logging
 import os
 import time
@@ -81,7 +82,27 @@ def run_cycle(
         time.sleep(2)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Bot d'alertes Vinted vers Discord.")
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Effectue une seule vérification puis s'arrête (pratique pour tester).",
+    )
+    parser.add_argument(
+        "--force-notify",
+        action="store_true",
+        help=(
+            "Envoie les notifications dès le premier passage, y compris pour des "
+            "annonces déjà vues. Sert uniquement à vérifier que le webhook Discord "
+            "fonctionne. À ne pas utiliser en usage normal (spam le salon)."
+        ),
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
     load_dotenv()
 
     webhook_url = os.environ["DISCORD_WEBHOOK_URL"]
@@ -101,6 +122,33 @@ def main() -> None:
     brand_ids = resolve_brands(client, brands_config)
     if not brand_ids:
         logger.error("Aucune marque valide dans la config, arrêt du bot.")
+        return
+
+    if args.force_notify:
+        logger.warning(
+            "Mode test --force-notify : envoi d'une annonce existante par marque, "
+            "sans marquer d'état (juste pour vérifier le webhook Discord)."
+        )
+        for name, brand_id in brand_ids.items():
+            price_to = next(
+                (b.get("max_price") for b in brands_config if b["name"] == name),
+                default_max_price,
+            )
+            try:
+                items = client.search_new_items(brand_id, price_to=price_to, per_page=1)
+            except Exception:
+                logger.exception("Erreur recherche test pour %s", name)
+                continue
+            if not items:
+                logger.info("Aucune annonce actuelle pour %s, rien à envoyer.", name)
+                continue
+            item = items[0]
+            if not item.get("url"):
+                item["url"] = f"{client.base_url}/items/{item['id']}"
+            notifier.send_item(item, name)
+            logger.info("Test envoyé pour %s: %s", name, item.get("title"))
+            time.sleep(1)
+        logger.info("Test terminé, vérifie le salon Discord.")
         return
 
     logger.info(
@@ -124,6 +172,9 @@ def main() -> None:
         if first_pass:
             logger.info("Premier passage terminé, les alertes démarrent maintenant.")
             first_pass = False
+        if args.once:
+            logger.info("Mode --once : arrêt après un seul passage.")
+            return
         time.sleep(check_interval)
 
 
