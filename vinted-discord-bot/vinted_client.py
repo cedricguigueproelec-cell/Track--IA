@@ -36,6 +36,11 @@ class VintedClient:
         )
         self._warm_up()
 
+    def refresh_session(self) -> None:
+        """Revisite le site pour renouveler les cookies anti-bot. À utiliser
+        si les réponses de l'API semblent suspectes (résultats génériques)."""
+        self._warm_up()
+
     def _warm_up(self) -> None:
         # Vinted protège son API avec des cookies anti-bot (DataDome). Une
         # visite de la page d'accueil, puis d'une page de recherche (celle-là
@@ -66,7 +71,7 @@ class VintedClient:
 
         for brand in brands:
             if brand.get("title", "").strip().lower() == needle:
-                return {"id": brand.get("id"), "title": brand.get("title")}
+                return {"id": brand.get("id"), "title": brand.get("title"), "match": "exact"}
 
         for brand in brands:
             title = brand.get("title", "").strip().lower()
@@ -78,7 +83,7 @@ class VintedClient:
                     brand.get("title"),
                     brand.get("id"),
                 )
-                return {"id": brand.get("id"), "title": brand.get("title")}
+                return {"id": brand.get("id"), "title": brand.get("title"), "match": "partial"}
 
         best = brands[0]
         logger.warning(
@@ -89,7 +94,7 @@ class VintedClient:
             best.get("title"),
             best.get("id"),
         )
-        return {"id": best.get("id"), "title": best.get("title")}
+        return {"id": best.get("id"), "title": best.get("title"), "match": "fallback"}
 
     def resolve_brand_id(self, brand_name: str) -> Optional[int]:
         """Retrouve l'identifiant interne Vinted d'une marque à partir de son nom."""

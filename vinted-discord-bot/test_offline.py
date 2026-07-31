@@ -110,6 +110,33 @@ def test_run_cycle_dispatches_by_brand_and_filters_price():
     print("OK: run_cycle envoie seulement les bonnes marques sous leur prix max")
 
 
+def test_resolve_brands_never_trusts_fallback_without_retry():
+    """Un résultat 'fallback' (correspondance non fiable, ex: leurre
+    anti-bot type 'toujours adidas') ne doit jamais être accepté tel quel :
+    le bot doit rafraîchir sa session et réessayer avant de faire
+    confiance, et exclure la marque si le nouvel essai est encore mauvais."""
+    client = MagicMock()
+    client.resolve_brand.side_effect = [
+        {"id": 1, "title": "Nike", "match": "exact"},
+        {"id": 14, "title": "adidas", "match": "fallback"},  # Introuvable, 1er essai
+        {"id": 14, "title": "adidas", "match": "fallback"},  # Introuvable, réessai -> toujours mauvais
+        {"id": 14, "title": "adidas", "match": "fallback"},  # Carhartt, 1er essai
+        {"id": 77, "title": "Carhartt", "match": "exact"},  # Carhartt, réessai -> bon résultat
+    ]
+
+    with patch("bot.time.sleep"):
+        brand_info = bot.resolve_brands(
+            client,
+            [{"name": "Nike"}, {"name": "Introuvable"}, {"name": "Carhartt"}],
+        )
+
+    assert brand_info["Nike"]["id"] == 1
+    assert brand_info["Carhartt"]["id"] == 77, "doit utiliser le résultat du réessai, pas le leurre"
+    assert "Introuvable" not in brand_info, "un résultat resté suspect après réessai ne doit jamais être accepté"
+    assert client.refresh_session.call_count == 2
+    print("OK: resolve_brands ne fait jamais confiance à un résultat 'fallback' sans vérification")
+
+
 def test_discord_notifier_payload():
     notifier = DiscordNotifier(webhook_url="https://discord.com/api/webhooks/fake/fake")
 
@@ -158,6 +185,7 @@ if __name__ == "__main__":
     test_resolve_brand_id()
     test_search_new_items_params()
     test_search_items_for_brands_multi()
+    test_resolve_brands_never_trusts_fallback_without_retry()
     test_run_cycle_dispatches_by_brand_and_filters_price()
     test_discord_notifier_payload()
     test_seen_items_store_roundtrip()

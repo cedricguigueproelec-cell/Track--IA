@@ -58,19 +58,55 @@ def load_config(path: str) -> dict:
 
 
 def resolve_brands(client: VintedClient, brands_config: list) -> dict:
-    """name -> {'id':, 'title':} pour chaque marque valide de la config."""
+    """name -> {'id':, 'title':} pour chaque marque valide de la config.
+
+    Vinted répond parfois par un résultat générique/factice (souvent
+    "adidas") au lieu d'une vraie erreur quand il détecte un usage
+    automatisé trop rapide. Un résultat "fallback" (déjà la correspondance
+    la moins fiable en soi) n'est donc JAMAIS accepté directement : on
+    marque une pause, on renouvelle la session, et on réessaie une fois
+    avant de faire confiance au résultat — sinon la marque est ignorée
+    pour ce cycle plutôt que mappée sur une valeur probablement fausse.
+    """
     brand_info = {}
+
     for brand in brands_config:
         name = brand["name"]
         resolved = client.resolve_brand(name)
+
+        if resolved is not None and resolved.get("match") == "fallback":
+            logger.warning(
+                "Résultat non fiable pour '%s' (correspondance approximative : '%s', "
+                "id %s) — pause et nouvelle tentative avant d'y faire confiance.",
+                name,
+                resolved.get("title"),
+                resolved.get("id"),
+            )
+            time.sleep(15)
+            client.refresh_session()
+            time.sleep(2)
+            retry = client.resolve_brand(name)
+            if retry is not None and retry.get("match") != "fallback":
+                resolved = retry
+            else:
+                logger.error(
+                    "'%s' toujours pas résolue de façon fiable après nouvelle tentative "
+                    "(Vinted bloque probablement les requêtes en ce moment) : marque "
+                    "ignorée pour ce cycle.",
+                    name,
+                )
+                time.sleep(3)
+                continue
+
         if resolved is None:
             logger.warning("Marque introuvable sur Vinted, ignorée: %s", name)
             continue
+
         brand_info[name] = resolved
         logger.info(
             "Marque résolue: %s -> id %s (%s)", name, resolved["id"], resolved["title"]
         )
-        time.sleep(1)
+        time.sleep(2)
     return brand_info
 
 
