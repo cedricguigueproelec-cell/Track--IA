@@ -39,6 +39,7 @@ def resolve_brands(client: VintedClient, brands_config: list) -> dict:
             continue
         brand_ids[name] = brand_id
         logger.info("Marque résolue: %s -> id %s", name, brand_id)
+        time.sleep(1)
     return brand_ids
 
 
@@ -138,7 +139,9 @@ def main() -> None:
                 items = client.search_new_items(brand_id, price_to=price_to, per_page=1)
             except Exception:
                 logger.exception("Erreur recherche test pour %s", name)
+                time.sleep(2)
                 continue
+            time.sleep(1)
             if not items:
                 logger.info("Aucune annonce actuelle pour %s, rien à envoyer.", name)
                 continue
