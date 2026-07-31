@@ -53,8 +53,26 @@ def setup_logging(log_path: str) -> None:
 
 
 def load_config(path: str) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        raise SystemExit(
+            f"Fichier de config introuvable: {path}. "
+            f"Copiez config.example.yaml en config.yaml (voir le README)."
+        )
+    except yaml.YAMLError as e:
+        raise SystemExit(f"config.yaml invalide (erreur YAML): {e}")
+
+    if not isinstance(config, dict) or not config.get("brands"):
+        raise SystemExit(
+            f"{path} ne contient aucune marque (clé 'brands' manquante ou vide)."
+        )
+    for i, brand in enumerate(config["brands"]):
+        if not isinstance(brand, dict) or not brand.get("name"):
+            raise SystemExit(f"{path}: l'entrée brands[{i}] doit avoir au moins un 'name'.")
+
+    return config
 
 
 def resolve_brands(client: VintedClient, brands_config: list, cache: BrandCache) -> dict:
@@ -279,7 +297,6 @@ def main() -> None:
     args = parse_args()
     load_dotenv()
 
-    webhook_url = os.environ["DISCORD_WEBHOOK_URL"]
     domain = os.environ.get("VINTED_DOMAIN", "vinted.fr")
     check_interval = int(os.environ.get("CHECK_INTERVAL_SECONDS", "20"))
     brand_retry_interval = int(os.environ.get("BRAND_RETRY_INTERVAL_SECONDS", "300"))
@@ -289,6 +306,20 @@ def main() -> None:
     log_path = os.environ.get("LOG_PATH", "bot.log")
 
     setup_logging(log_path)
+
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        raise SystemExit(
+            "DISCORD_WEBHOOK_URL n'est pas défini (fichier .env en local, "
+            "secret GitHub Actions en CI). Voir le README, section 1."
+        )
+    if not webhook_url.startswith("https://discord.com/api/webhooks/") and not webhook_url.startswith(
+        "https://discordapp.com/api/webhooks/"
+    ):
+        logger.warning(
+            "DISCORD_WEBHOOK_URL ne ressemble pas à une URL de webhook Discord "
+            "valide, vérifiez qu'elle est complète et correctement copiée."
+        )
 
     config = load_config(config_path)
     brands_config = config["brands"]

@@ -17,12 +17,22 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
+      # Actions épinglées à leur commit (pas juste au tag) : le tag "v7"
+      # pourrait en théorie être redirigé vers un autre code, le hash non.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
+
+      - name: Vérifier que le secret webhook est configuré
+        run: |
+          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            echo "::error::Le secret DISCORD_WEBHOOK_URL n'est pas configuré (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
 
       - name: Installer les dépendances
         working-directory: vinted-discord-bot
@@ -38,7 +48,11 @@ jobs:
           BRAND_CACHE_PATH: brand_cache.json
         run: python bot.py --once
 
+      # if: always() : même si l'étape précédente échoue (bug, incident
+      # Vinted...), on sauvegarde quand même tout progrès déjà fait (ex: une
+      # marque résolue avant l'échec) plutôt que de le perdre.
       - name: Sauvegarder l'état (annonces vues + marques résolues)
+        if: always()
         working-directory: vinted-discord-bot
         run: |
           if ! git diff --quiet -- seen_items.json brand_cache.json; then
