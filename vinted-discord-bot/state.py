@@ -18,7 +18,7 @@ class SeenItemsStore:
     def _load(self) -> Set[int]:
         if self.path.exists():
             try:
-                return set(json.loads(self.path.read_text()))
+                return set(json.loads(self.path.read_text(encoding="utf-8")))
             except (json.JSONDecodeError, OSError):
                 logger.warning("Impossible de lire %s, redémarrage à vide.", self.path)
         return set()
@@ -31,7 +31,7 @@ class SeenItemsStore:
 
     def save(self) -> None:
         ids = list(self._ids)[-MAX_STORED_IDS:]
-        self.path.write_text(json.dumps(ids))
+        self.path.write_text(json.dumps(ids), encoding="utf-8")
 
 
 class BrandCache:
@@ -51,7 +51,7 @@ class BrandCache:
     def _load(self) -> dict:
         if self.path.exists():
             try:
-                return json.loads(self.path.read_text())
+                return json.loads(self.path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 logger.warning("Impossible de lire %s, cache de marques vide.", self.path)
         return {}
@@ -63,4 +63,6 @@ class BrandCache:
         self._data[brand_name] = {"id": id_, "title": title}
 
     def save(self) -> None:
-        self.path.write_text(json.dumps(self._data, ensure_ascii=False, indent=2))
+        self.path.write_text(
+            json.dumps(self._data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
