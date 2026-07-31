@@ -1,0 +1,47 @@
+name: Bot alertes Vinted
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vinted-bot
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        working-directory: vinted-discord-bot
+        run: pip install -r requirements.txt
+
+      - name: Vérifier Vinted et notifier Discord
+        working-directory: vinted-discord-bot
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          VINTED_DOMAIN: vinted.fr
+          CONFIG_PATH: config.yaml
+          STATE_PATH: seen_items.json
+        run: python bot.py --once
+
+      - name: Sauvegarder l'état des annonces déjà vues
+        working-directory: vinted-discord-bot
+        run: |
+          if ! git diff --quiet -- seen_items.json; then
+            git config user.name "vinted-bot"
+            git config user.email "actions@github.com"
+            git add seen_items.json
+            git commit -m "chore: update seen items state [skip ci]"
+            git push
+          fi
