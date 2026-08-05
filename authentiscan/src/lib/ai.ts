@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type, FinishReason, type Schema } from "@google/genai";
 
 let client: GoogleGenAI | null = null;
 
@@ -55,27 +55,86 @@ Règles strictes :
 - Sois honnête sur l'incertitude : si les photos sont insuffisantes ou ambiguës, dis-le (verdict INDETERMINE, confidence FAIBLE) plutôt que d'inventer une certitude.
 - Ne donne jamais une garantie à 100%. Ceci est une aide à la décision, pas une expertise légale.
 - Base-toi sur des détails précis et vérifiables, jamais de généralités.
-- Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, correspondant exactement à ce schéma :
-
-{
-  "verdict": "AUTHENTIQUE" | "SUSPECT" | "CONTREFACON" | "INDETERMINE",
-  "score": <entier 0-100, probabilité d'authenticité>,
-  "confidence": "FAIBLE" | "MOYENNE" | "ELEVEE",
-  "redFlags": [<string, points de vigilance ou anomalies détectées, liste vide si aucun>],
-  "checklist": [{"label": string, "ok": boolean, "note": string}, ...] (4 à 6 points vérifiés : logo, coutures, matière, étiquette, ferrures/quincaillerie, finitions - uniquement ceux visibles sur les photos fournies),
-  "reasoning": <string, explication synthétique en français, 3-5 phrases>
-}`;
+- Le format de la réponse est imposé par un schéma JSON strict, contente-toi de remplir les champs.`;
 
 const SNIPER_ADDENDUM = `
-En plus du JSON ci-dessus, si et seulement si l'article semble authentique ou probablement authentique (score >= 40), ajoute aussi ces champs au même objet JSON :
-{
-  ...
-  "resalePriceMin": <nombre, estimation basse du prix de revente sur Vinted en euros pour cet état/cette marque>,
-  "resalePriceMax": <nombre, estimation haute>,
-  "vintedTitle": <string, titre d'annonce Vinted optimisé, percutant, avec mots-clés recherchés, max 70 caractères>,
-  "vintedDescription": <string, description complète prête à publier sur Vinted : état, matière, mesures utiles, points forts, mots-clés SEO Vinted, ton vendeur engageant, emojis sobres, 100-200 mots>
+Estime aussi un prix de revente Vinted et rédige une annonce, uniquement si l'article semble authentique ou probablement authentique (score >= 40). Si le score est inférieur à 40, laisse ces champs à null.`;
+
+const BASE_SCHEMA_PROPERTIES: Record<string, Schema> = {
+  verdict: {
+    type: Type.STRING,
+    enum: ["AUTHENTIQUE", "SUSPECT", "CONTREFACON", "INDETERMINE"],
+    description: "Verdict global sur l'authenticité de l'article.",
+  },
+  score: {
+    type: Type.INTEGER,
+    description: "Probabilité d'authenticité, entier de 0 à 100.",
+  },
+  confidence: {
+    type: Type.STRING,
+    enum: ["FAIBLE", "MOYENNE", "ELEVEE"],
+    description: "Confiance dans le verdict, selon la qualité/suffisance des photos.",
+  },
+  redFlags: {
+    type: Type.ARRAY,
+    items: { type: Type.STRING },
+    description: "Points de vigilance ou anomalies détectées. Liste vide si aucun.",
+  },
+  checklist: {
+    type: Type.ARRAY,
+    description:
+      "4 à 6 points vérifiés (logo, coutures, matière, étiquette, ferrures/quincaillerie, finitions) — uniquement ceux visibles sur les photos fournies.",
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        label: { type: Type.STRING },
+        ok: { type: Type.BOOLEAN },
+        note: { type: Type.STRING },
+      },
+      required: ["label", "ok", "note"],
+    },
+  },
+  reasoning: {
+    type: Type.STRING,
+    description: "Explication synthétique en français, 3 à 5 phrases.",
+  },
+};
+
+const RESALE_SCHEMA_PROPERTIES: Record<string, Schema> = {
+  resalePriceMin: {
+    type: Type.NUMBER,
+    nullable: true,
+    description: "Estimation basse du prix de revente Vinted en euros, ou null si score < 40.",
+  },
+  resalePriceMax: {
+    type: Type.NUMBER,
+    nullable: true,
+    description: "Estimation haute du prix de revente Vinted en euros, ou null si score < 40.",
+  },
+  vintedTitle: {
+    type: Type.STRING,
+    nullable: true,
+    description: "Titre d'annonce Vinted optimisé, percutant, max 70 caractères, ou null si score < 40.",
+  },
+  vintedDescription: {
+    type: Type.STRING,
+    nullable: true,
+    description:
+      "Description Vinted prête à publier (état, matière, mesures, points forts, mots-clés SEO, ton vendeur engageant, emojis sobres, 100-200 mots), ou null si score < 40.",
+  },
+};
+
+function buildResponseSchema(includeResaleAnalysis: boolean): Schema {
+  const properties = includeResaleAnalysis
+    ? { ...BASE_SCHEMA_PROPERTIES, ...RESALE_SCHEMA_PROPERTIES }
+    : BASE_SCHEMA_PROPERTIES;
+
+  return {
+    type: Type.OBJECT,
+    properties,
+    required: ["verdict", "score", "confidence", "redFlags", "checklist", "reasoning"],
+  };
 }
-Si le score est inférieur à 40, mets ces 4 champs à null.`;
 
 function buildContentParts(
   itemName: string | undefined,
@@ -110,6 +169,13 @@ function extractJson(text: string): unknown {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+const FINISH_REASON_MESSAGES: Partial<Record<FinishReason, string>> = {
+  [FinishReason.SAFETY]: "L'analyse a été bloquée par les filtres de sécurité de l'IA. Réessayez avec d'autres photos.",
+  [FinishReason.MAX_TOKENS]: "La réponse de l'IA a été coupée (trop longue). Réessayez.",
+  [FinishReason.RECITATION]: "L'analyse a été bloquée (contenu potentiellement protégé détecté). Réessayez avec d'autres photos.",
+  [FinishReason.PROHIBITED_CONTENT]: "L'analyse a été bloquée par les filtres de sécurité de l'IA. Réessayez avec d'autres photos.",
+};
+
 export async function analyzeAuthenticity(params: {
   itemName?: string;
   brand?: string;
@@ -127,12 +193,20 @@ export async function analyzeAuthenticity(params: {
     contents: [{ role: "user", parts: buildContentParts(itemName, brand, images) }],
     config: {
       systemInstruction: SYSTEM_PROMPT + (includeResaleAnalysis ? SNIPER_ADDENDUM : ""),
-      maxOutputTokens: 1500,
+      maxOutputTokens: 4096,
+      thinkingConfig: { thinkingBudget: 0 },
+      responseMimeType: "application/json",
+      responseSchema: buildResponseSchema(includeResaleAnalysis),
     },
   });
 
+  const finishReason = response.candidates?.[0]?.finishReason;
   const text = response.text;
-  if (!text) throw new Error("Réponse IA vide.");
+
+  if (!text) {
+    const knownMessage = finishReason && FINISH_REASON_MESSAGES[finishReason];
+    throw new Error(knownMessage ?? `Réponse IA vide (finishReason: ${finishReason ?? "inconnu"}).`);
+  }
 
   const parsed = extractJson(text) as AnalysisResult;
 
