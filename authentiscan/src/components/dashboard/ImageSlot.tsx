@@ -1,7 +1,26 @@
 "use client";
 
-import { useRef } from "react";
-import { Camera, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, X, Loader2 } from "lucide-react";
+
+const MAX_DIMENSION = 1600;
+const JPEG_QUALITY = 0.82;
+
+async function compressToDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Compression d'image impossible.");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+
+  return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+}
 
 export default function ImageSlot({
   label,
@@ -17,13 +36,18 @@ export default function ImageSlot({
   onChange: (dataUrl: string | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [compressing, setCompressing] = useState(false);
 
-  function handleFile(file: File | undefined) {
+  async function handleFile(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => onChange(reader.result as string);
-    reader.readAsDataURL(file);
+    setCompressing(true);
+    try {
+      const dataUrl = await compressToDataUrl(file);
+      onChange(dataUrl);
+    } finally {
+      setCompressing(false);
+    }
   }
 
   return (
@@ -57,11 +81,12 @@ export default function ImageSlot({
       ) : (
         <button
           type="button"
+          disabled={compressing}
           onClick={() => inputRef.current?.click()}
-          className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-2 text-muted transition hover:border-brand/50 hover:text-brand"
+          className="flex h-44 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-2 text-muted transition hover:border-brand/50 hover:text-brand disabled:opacity-60"
         >
-          <Camera size={26} />
-          <span className="text-sm">Ajouter une photo</span>
+          {compressing ? <Loader2 size={26} className="animate-spin" /> : <Camera size={26} />}
+          <span className="text-sm">{compressing ? "Traitement..." : "Ajouter une photo"}</span>
         </button>
       )}
     </div>
