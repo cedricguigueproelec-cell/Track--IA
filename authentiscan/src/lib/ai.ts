@@ -188,17 +188,28 @@ export async function analyzeAuthenticity(params: {
   const genAI = getClient();
   const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
-  const response = await genAI.models.generateContent({
-    model,
-    contents: [{ role: "user", parts: buildContentParts(itemName, brand, images) }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT + (includeResaleAnalysis ? SNIPER_ADDENDUM : ""),
-      maxOutputTokens: 4096,
-      thinkingConfig: { thinkingBudget: 0 },
-      responseMimeType: "application/json",
-      responseSchema: buildResponseSchema(includeResaleAnalysis),
-    },
-  });
+  let response;
+  try {
+    response = await genAI.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: buildContentParts(itemName, brand, images) }],
+      config: {
+        systemInstruction: SYSTEM_PROMPT + (includeResaleAnalysis ? SNIPER_ADDENDUM : ""),
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseSchema: buildResponseSchema(includeResaleAnalysis),
+      },
+    });
+  } catch (err) {
+    const status = (err as { status?: number })?.status;
+    if (status === 429) {
+      throw new Error("Trop de demandes en même temps sur le tier gratuit de l'IA. Réessayez dans une minute.");
+    }
+    if (status === 503) {
+      throw new Error("Le service IA est momentanément surchargé. Réessayez dans quelques instants.");
+    }
+    throw err;
+  }
 
   const finishReason = response.candidates?.[0]?.finishReason;
   const text = response.text;
