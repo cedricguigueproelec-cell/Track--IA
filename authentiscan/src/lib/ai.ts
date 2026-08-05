@@ -1,16 +1,16 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
-let client: Anthropic | null = null;
+let client: GoogleGenAI | null = null;
 
-function getClient(): Anthropic {
+function getClient(): GoogleGenAI {
   if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error(
-        "ANTHROPIC_API_KEY manquante. L'IA ne peut pas fonctionner sans clé API valide (voir .env.example)."
+        "GEMINI_API_KEY manquante. L'IA ne peut pas fonctionner sans clé API valide (voir .env.example)."
       );
     }
-    client = new Anthropic({ apiKey });
+    client = new GoogleGenAI({ apiKey });
   }
   return client;
 }
@@ -77,12 +77,12 @@ En plus du JSON ci-dessus, si et seulement si l'article semble authentique ou pr
 }
 Si le score est inférieur à 40, mets ces 4 champs à null.`;
 
-function buildUserContent(
+function buildContentParts(
   itemName: string | undefined,
   brand: string | undefined,
   images: AnalysisImageInput[]
-): Anthropic.MessageParam["content"] {
-  const content: Anthropic.MessageParam["content"] = [];
+) {
+  const parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[] = [];
 
   const intro = [
     itemName ? `Article déclaré : ${itemName}` : null,
@@ -92,21 +92,15 @@ function buildUserContent(
     .filter(Boolean)
     .join("\n");
 
-  content.push({ type: "text", text: intro });
+  parts.push({ text: intro });
 
   for (const img of images) {
     const { mediaType, base64 } = parseDataUrl(img.dataUrl);
-    content.push({
-      type: "text",
-      text: `Photo suivante : ${IMAGE_KIND_LABELS[img.kind] ?? img.kind}`,
-    });
-    content.push({
-      type: "image",
-      source: { type: "base64", media_type: mediaType as "image/jpeg", data: base64 },
-    });
+    parts.push({ text: `Photo suivante : ${IMAGE_KIND_LABELS[img.kind] ?? img.kind}` });
+    parts.push({ inlineData: { mimeType: mediaType, data: base64 } });
   }
 
-  return content;
+  return parts;
 }
 
 function extractJson(text: string): unknown {
@@ -125,20 +119,22 @@ export async function analyzeAuthenticity(params: {
   const { itemName, brand, images, includeResaleAnalysis } = params;
   if (images.length === 0) throw new Error("Au moins une photo est requise.");
 
-  const anthropic = getClient();
-  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+  const genAI = getClient();
+  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
 
-  const response = await anthropic.messages.create({
+  const response = await genAI.models.generateContent({
     model,
-    max_tokens: 1500,
-    system: SYSTEM_PROMPT + (includeResaleAnalysis ? SNIPER_ADDENDUM : ""),
-    messages: [{ role: "user", content: buildUserContent(itemName, brand, images) }],
+    contents: [{ role: "user", parts: buildContentParts(itemName, brand, images) }],
+    config: {
+      systemInstruction: SYSTEM_PROMPT + (includeResaleAnalysis ? SNIPER_ADDENDUM : ""),
+      maxOutputTokens: 1500,
+    },
   });
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") throw new Error("Réponse IA vide.");
+  const text = response.text;
+  if (!text) throw new Error("Réponse IA vide.");
 
-  const parsed = extractJson(textBlock.text) as AnalysisResult;
+  const parsed = extractJson(text) as AnalysisResult;
 
   if (!parsed.verdict || typeof parsed.score !== "number") {
     throw new Error("Réponse IA malformée.");

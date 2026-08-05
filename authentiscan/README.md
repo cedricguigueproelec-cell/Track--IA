@@ -7,7 +7,7 @@ les points de vigilance. 3 forfaits (STARTER / EXPERT / SNIPER), essai
 gratuit sans CB, parrainage, certificat partageable.
 
 > ⚠️ **Important** : l'analyse est une aide à la décision basée sur une
-> analyse visuelle par IA (Claude, Anthropic). Aucune IA ne peut garantir
+> analyse visuelle par IA (Gemini, Google). Aucune IA ne peut garantir
 > l'authenticité d'un article à 100 % sur simple photo — c'est assumé et
 > affiché honnêtement partout dans le produit (landing, FAQ, résultats,
 > certificat). Ne présentez jamais le service comme une garantie légale.
@@ -17,7 +17,7 @@ gratuit sans CB, parrainage, certificat partageable.
 - **Next.js 16** (App Router, Turbopack) + TypeScript + Tailwind CSS 4
 - **Prisma** + SQLite en dev (bascule Postgres en une ligne pour la prod)
 - **NextAuth v5** (credentials + JWT)
-- **Anthropic SDK** (`@anthropic-ai/sdk`) — moteur d'analyse vision
+- **Google Gemini SDK** (`@google/genai`) — moteur d'analyse vision
 - **Stripe** — abonnements, webhook, portail de facturation
 
 ## Démarrage en local
@@ -32,7 +32,9 @@ npm run dev
 Ouvrez [http://localhost:3000](http://localhost:3000).
 
 Pour que l'authentification IA fonctionne réellement en local, renseignez
-`ANTHROPIC_API_KEY` dans `.env`. Sans clé, le reste du site (inscription,
+`GEMINI_API_KEY` dans `.env` (clé gratuite sur
+[Google AI Studio](https://aistudio.google.com/apikey), aucune carte
+bancaire requise). Sans clé, le reste du site (inscription,
 tableau de bord, tarifs, facturation) fonctionne normalement ; seule
 l'analyse elle-même renverra une erreur claire (et ne décompte jamais de
 crédit dans ce cas — voir `lib/quota.ts` → `refundQuota`).
@@ -59,9 +61,13 @@ voir `lib/quota.ts`). Stack recommandée, 100 % gratuite pour démarrer :
    - Renseignez `DATABASE_URL` avec l'URL Postgres fournie.
    - Lancez `npx prisma migrate deploy` (en CI/CD ou manuellement) pour
      appliquer le schéma.
-3. **IA** : créez une clé sur [console.anthropic.com](https://console.anthropic.com),
-   renseignez `ANTHROPIC_API_KEY`. C'est cette clé, seule, qui fait tourner
-   l'IA en continu — aucun serveur GPU à gérer.
+3. **IA** : créez une clé gratuite sur
+   [Google AI Studio](https://aistudio.google.com/apikey) (aucune carte
+   bancaire requise, le tier gratuit n'expire pas), renseignez
+   `GEMINI_API_KEY`. C'est cette clé, seule, qui fait tourner l'IA en
+   continu — aucun serveur GPU à gérer. Le tier gratuit est limité en
+   requêtes/minute ; si le volume grossit, activez la facturation sur le
+   même projet Google Cloud sans changer de code.
 4. **Paiements** : créez un compte [Stripe](https://dashboard.stripe.com),
    créez 3 Prix récurrents mensuels (5,99€ / 9,99€ / 15,99€) et reportez
    leurs `price_id` dans `STRIPE_PRICE_STARTER` / `STRIPE_PRICE_EXPERT` /
@@ -81,7 +87,7 @@ Toutes les variables sont listées avec leur usage dans `.env.example`.
 
 ## Fonctionnement du produit
 
-- **Analyse** (`src/lib/ai.ts`) : envoie les photos à Claude (vision) avec
+- **Analyse** (`src/lib/ai.ts`) : envoie les photos à Gemini (vision) avec
   un prompt d'expert authentification, qui répond en JSON structuré
   (verdict, score, confiance, points de vigilance, checklist, raisonnement
   — et pour SNIPER, fourchette de prix de revente Vinted + annonce prête à

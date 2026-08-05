@@ -4,7 +4,7 @@ const POINTS = [
   {
     icon: Cpu,
     title: "IA multimodale de pointe",
-    text: "L'analyse s'appuie sur les modèles Claude d'Anthropic, entraînés à repérer des détails visuels fins (typographie, coutures, textures).",
+    text: "L'analyse s'appuie sur les modèles Gemini de Google, entraînés à repérer des détails visuels fins (typographie, coutures, textures).",
   },
   {
     icon: Clock,
