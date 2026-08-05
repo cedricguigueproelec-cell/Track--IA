@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+:root {
+  --background: #070b10;
+  --surface: #0e151d;
+  --surface-2: #131c26;
+  --border: #1f2c38;
+  --foreground: #eaf2f5;
+  --muted: #8ea3ae;
+  --brand: #14e0c4;
+  --brand-dark: #0bb8a0;
+  --brand-soft: rgba(20, 224, 196, 0.12);
+  --danger: #ff5c72;
+  --warning: #ffb020;
+  --success: #2ee6a6;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-soft: var(--brand-soft);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(20, 224, 196, 0.10), transparent), var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+::selection {
+  background: var(--brand);
+  color: #04110d;
+}
+
+.glow-text {
+  text-shadow: 0 0 30px rgba(20, 224, 196, 0.35);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.btn-brand {
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  color: #04110d;
+  font-weight: 600;
+}
+
+.btn-brand:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.animate-scan {
+  animation: scan 2.2s ease-in-out infinite;
+}

@@ -1,0 +1,74 @@
+// Prisma schema — AuthentiScan
+// Dev: SQLite (fichier local, zéro config). Prod: changer provider en
+// "postgresql" et DATABASE_URL vers votre base (Neon/Supabase/RDS...).
+// Voir README.md > Déploiement.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  name              String?
+  createdAt         DateTime @default(now())
+
+  // Abonnement — "FREE" | "STARTER" | "EXPERT" | "SNIPER"
+  plan              String   @default("FREE")
+  stripeCustomerId       String? @unique
+  stripeSubscriptionId   String? @unique
+  stripeCurrentPeriodEnd DateTime?
+
+  // Quotas — compteurs remis à zéro par cron / à la demande (voir lib/quota.ts)
+  monthlyUsageCount Int      @default(0)
+  monthlyResetAt    DateTime @default(now())
+  dailyUsageCount   Int      @default(0)
+  dailyResetAt      DateTime @default(now())
+
+  // Essai gratuit sans CB : quelques authentifications offertes à vie
+  freeTrialUsed     Int      @default(0)
+  freeTrialLimit    Int      @default(3)
+
+  // Parrainage
+  referralCode      String   @unique
+  referredById      String?
+  referredBy        User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]   @relation("Referrals")
+  referralBonus     Int      @default(0) // crédits bonus gagnés (hors quota du plan)
+
+  requests          AuthenticationRequest[]
+}
+
+model AuthenticationRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  itemName    String?
+  brand       String?
+  imageCount  Int      @default(0)
+
+  status      String   @default("PENDING") // PENDING | DONE | ERROR
+
+  verdict     String?  // AUTHENTIQUE | SUSPECT | CONTREFACON | INDETERMINE
+  score       Int?     // 0-100 = probabilité d'authenticité
+  confidence  String?  // FAIBLE | MOYENNE | ELEVEE
+  redFlags    String?  // JSON string[]
+  checklist   String?  // JSON {label:string, ok:boolean, note:string}[]
+  reasoning   String?
+
+  // Bonus plan SNIPER
+  resalePriceMin  Float?
+  resalePriceMax  Float?
+  vintedTitle     String?
+  vintedDescription String?
+
+  errorMessage String?
+}
