@@ -1,14 +1,14 @@
 // Prisma schema — AuthentiScan
-// Dev: SQLite (fichier local, zéro config). Prod: changer provider en
-// "postgresql" et DATABASE_URL vers votre base (Neon/Supabase/RDS...).
-// Voir README.md > Déploiement.
+// Provider Postgres par défaut (Neon/Supabase/RDS...) pour matcher le
+// déploiement en production. Voir README.md > Déploiement local pour
+// l'alternative SQLite en dev.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
