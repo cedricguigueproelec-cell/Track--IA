@@ -18,8 +18,8 @@ export default function Hero() {
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted">
           Prenez en photo le logo, l&apos;étiquette et les coutures de n&apos;importe quel article de mode.
-          Notre IA les analyse et vous donne un verdict clair, un score de fiabilité et les points de
-          vigilance — avant d&apos;acheter ou de vendre.
+          Notre IA les analyse et vous répond clairement par oui ou par non, avec les points de
+          vigilance à l&apos;appui — avant d&apos;acheter ou de vendre.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

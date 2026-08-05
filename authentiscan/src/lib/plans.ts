@@ -31,7 +31,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     features: [
       "3 authentifications offertes à vie",
       "Analyse IA du logo, étiquette et matière",
-      "Verdict + score de fiabilité",
+      "Réponse claire oui/non + niveau de confiance",
     ],
   },
   STARTER: {

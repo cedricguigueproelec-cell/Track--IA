@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ScanSearch } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import VerdictBadge from "@/components/VerdictBadge";
-import ScoreGauge from "@/components/ScoreGauge";
+import AnswerCircle from "@/components/AnswerCircle";
 import { formatDate } from "@/lib/utils";
 
 export default async function CertificatPage(props: PageProps<"/certificat/[id]">) {
@@ -16,7 +16,6 @@ export default async function CertificatPage(props: PageProps<"/certificat/[id]"
       itemName: true,
       brand: true,
       verdict: true,
-      score: true,
       confidence: true,
       status: true,
       createdAt: true,
@@ -40,7 +39,7 @@ export default async function CertificatPage(props: PageProps<"/certificat/[id]"
         {request.brand && <p className="text-sm text-muted">{request.brand}</p>}
 
         <div className="mt-6 flex justify-center">
-          <ScoreGauge score={request.score ?? 0} />
+          <AnswerCircle authentic={request.verdict === "AUTHENTIQUE"} />
         </div>
 
         <div className="mt-4 flex justify-center">

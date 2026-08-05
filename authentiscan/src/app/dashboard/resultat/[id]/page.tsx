@@ -4,7 +4,7 @@ import { AlertTriangle, ExternalLink, PlusCircle } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import VerdictBadge from "@/components/VerdictBadge";
-import ScoreGauge from "@/components/ScoreGauge";
+import AnswerCircle from "@/components/AnswerCircle";
 import CopyButton from "@/components/dashboard/CopyButton";
 import { formatDate } from "@/lib/utils";
 
@@ -47,7 +47,7 @@ export default async function ResultatPage(props: PageProps<"/dashboard/resultat
       </div>
 
       <div className="card mt-6 flex flex-col items-center gap-6 p-8 text-center sm:flex-row sm:text-left">
-        <ScoreGauge score={request.score ?? 0} />
+        <AnswerCircle authentic={request.verdict === "AUTHENTIQUE"} />
         <div>
           <VerdictBadge verdict={request.verdict ?? "INDETERMINE"} />
           <p className="mt-3 text-sm text-muted">

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const FAQS = [
   {
     q: "L'IA garantit-elle à 100% qu'un article est authentique ?",
-    a: "Non, et personne ne peut le garantir sur photo à 100%. AuthentiScan vous donne un score de fiabilité et un niveau de confiance basés sur l'analyse visuelle de dizaines de détails. C'est un outil d'aide à la décision très fiable pour repérer les incohérences, pas une expertise légale.",
+    a: "Non, et personne ne peut le garantir sur photo à 100%. AuthentiScan vous donne une réponse claire (oui/non) et un niveau de confiance basés sur l'analyse visuelle de dizaines de détails. C'est un outil d'aide à la décision très fiable pour repérer les incohérences, pas une expertise légale.",
   },
   {
     q: "Quelles photos dois-je fournir ?",

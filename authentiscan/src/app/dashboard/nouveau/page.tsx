@@ -20,6 +20,7 @@ export default function NouvelleAnalysePage() {
   const router = useRouter();
   const [itemName, setItemName] = useState("");
   const [brand, setBrand] = useState("");
+  const [etiquette, setEtiquette] = useState<string | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [coutures, setCoutures] = useState<string | null>(null);
   const [autre, setAutre] = useState<string | null>(null);
@@ -31,7 +32,8 @@ export default function NouvelleAnalysePage() {
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const images = [
-    logo && { kind: "logo_etiquette", dataUrl: logo },
+    etiquette && { kind: "etiquette", dataUrl: etiquette },
+    logo && { kind: "logo", dataUrl: logo },
     coutures && { kind: "coutures_matiere", dataUrl: coutures },
     autre && { kind: "autre", dataUrl: autre },
   ].filter(Boolean) as { kind: string; dataUrl: string }[];
@@ -70,7 +72,7 @@ export default function NouvelleAnalysePage() {
     if (onCooldown) return;
 
     if (images.length === 0) {
-      setError("Ajoutez au moins une photo (idéalement l'étiquette/logo).");
+      setError("Ajoutez au moins une photo (idéalement l'étiquette).");
       return;
     }
 
@@ -142,14 +144,15 @@ export default function NouvelleAnalysePage() {
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <ImageSlot
-            label="Étiquette / logo"
+            label="Étiquette"
             hint="Le point le plus important"
             required
-            value={logo}
-            onChange={setLogo}
+            value={etiquette}
+            onChange={setEtiquette}
           />
+          <ImageSlot label="Logo" hint="Marquage / estampage de la marque" value={logo} onChange={setLogo} />
           <ImageSlot
             label="Coutures / matière"
             hint="Zoom sur les finitions"

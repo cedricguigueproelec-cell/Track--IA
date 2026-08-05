@@ -76,7 +76,6 @@ export async function POST(req: Request) {
       data: {
         status: "DONE",
         verdict: result.verdict,
-        score: result.score,
         confidence: result.confidence,
         redFlags: JSON.stringify(result.redFlags),
         checklist: JSON.stringify(result.checklist),

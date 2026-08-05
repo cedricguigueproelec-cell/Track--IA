@@ -16,7 +16,7 @@ function getClient(): GoogleGenAI {
 }
 
 export interface AnalysisImageInput {
-  /** ex: "logo_etiquette" | "coutures_matiere" | "autre" */
+  /** ex: "etiquette" | "logo" | "coutures_matiere" | "autre" */
   kind: string;
   /** data URL base64, ex: data:image/jpeg;base64,... */
   dataUrl: string;
@@ -24,7 +24,6 @@ export interface AnalysisImageInput {
 
 export interface AnalysisResult {
   verdict: "AUTHENTIQUE" | "SUSPECT" | "CONTREFACON" | "INDETERMINE";
-  score: number;
   confidence: "FAIBLE" | "MOYENNE" | "ELEVEE";
   redFlags: string[];
   checklist: { label: string; ok: boolean; note: string }[];
@@ -36,7 +35,8 @@ export interface AnalysisResult {
 }
 
 const IMAGE_KIND_LABELS: Record<string, string> = {
-  logo_etiquette: "Étiquette / logo de la marque",
+  etiquette: "Étiquette officielle (matière, référence, marquage)",
+  logo: "Logo de la marque",
   coutures_matiere: "Coutures / matière / finitions",
   autre: "Autre angle / vue d'ensemble",
 };
@@ -51,6 +51,8 @@ const SYSTEM_PROMPT = `Tu es un expert en authentification d'articles de mode (m
 
 On te fournit des photos d'un article (étiquette/logo, coutures/matière, autres angles) ainsi que son nom/marque déclarés. Ta mission : évaluer la probabilité que l'article soit authentique, en te basant UNIQUEMENT sur des éléments visuels observables (typographie du logo, qualité des coutures, régularité des points, alignement des motifs, qualité des matériaux, présence/format des étiquettes officielles, ferrures, finitions).
 
+Ta réponse doit trancher clairement : le verdict AUTHENTIQUE signifie "oui, probablement authentique" ; SUSPECT, CONTREFACON et INDETERMINE signifient tous "non, ne pas faire confiance sans vérification supplémentaire" (précise pourquoi dans le raisonnement — manque de preuve, éléments suspects, ou contrefaçon caractérisée).
+
 Règles strictes :
 - Sois honnête sur l'incertitude : si les photos sont insuffisantes ou ambiguës, dis-le (verdict INDETERMINE, confidence FAIBLE) plutôt que d'inventer une certitude.
 - Ne donne jamais une garantie à 100%. Ceci est une aide à la décision, pas une expertise légale.
@@ -58,17 +60,14 @@ Règles strictes :
 - Le format de la réponse est imposé par un schéma JSON strict, contente-toi de remplir les champs.`;
 
 const SNIPER_ADDENDUM = `
-Estime aussi un prix de revente Vinted et rédige une annonce, uniquement si l'article semble authentique ou probablement authentique (score >= 40). Si le score est inférieur à 40, laisse ces champs à null.`;
+Estime aussi un prix de revente Vinted et rédige une annonce, uniquement si le verdict est AUTHENTIQUE. Sinon, laisse ces champs à null.`;
 
 const BASE_SCHEMA_PROPERTIES: Record<string, Schema> = {
   verdict: {
     type: Type.STRING,
     enum: ["AUTHENTIQUE", "SUSPECT", "CONTREFACON", "INDETERMINE"],
-    description: "Verdict global sur l'authenticité de l'article.",
-  },
-  score: {
-    type: Type.INTEGER,
-    description: "Probabilité d'authenticité, entier de 0 à 100.",
+    description:
+      "Réponse binaire à la question 'cet article est-il authentique ?'. AUTHENTIQUE = oui. SUSPECT, CONTREFACON ou INDETERMINE = non (à préciser dans le raisonnement).",
   },
   confidence: {
     type: Type.STRING,
@@ -104,23 +103,23 @@ const RESALE_SCHEMA_PROPERTIES: Record<string, Schema> = {
   resalePriceMin: {
     type: Type.NUMBER,
     nullable: true,
-    description: "Estimation basse du prix de revente Vinted en euros, ou null si score < 40.",
+    description: "Estimation basse du prix de revente Vinted en euros, ou null si verdict != AUTHENTIQUE.",
   },
   resalePriceMax: {
     type: Type.NUMBER,
     nullable: true,
-    description: "Estimation haute du prix de revente Vinted en euros, ou null si score < 40.",
+    description: "Estimation haute du prix de revente Vinted en euros, ou null si verdict != AUTHENTIQUE.",
   },
   vintedTitle: {
     type: Type.STRING,
     nullable: true,
-    description: "Titre d'annonce Vinted optimisé, percutant, max 70 caractères, ou null si score < 40.",
+    description: "Titre d'annonce Vinted optimisé, percutant, max 70 caractères, ou null si verdict != AUTHENTIQUE.",
   },
   vintedDescription: {
     type: Type.STRING,
     nullable: true,
     description:
-      "Description Vinted prête à publier (état, matière, mesures, points forts, mots-clés SEO, ton vendeur engageant, emojis sobres, 100-200 mots), ou null si score < 40.",
+      "Description Vinted prête à publier (état, matière, mesures, points forts, mots-clés SEO, ton vendeur engageant, emojis sobres, 100-200 mots), ou null si verdict != AUTHENTIQUE.",
   },
 };
 
@@ -132,7 +131,7 @@ function buildResponseSchema(includeResaleAnalysis: boolean): Schema {
   return {
     type: Type.OBJECT,
     properties,
-    required: ["verdict", "score", "confidence", "redFlags", "checklist", "reasoning"],
+    required: ["verdict", "confidence", "redFlags", "checklist", "reasoning"],
   };
 }
 
@@ -221,13 +220,12 @@ export async function analyzeAuthenticity(params: {
 
   const parsed = extractJson(text) as AnalysisResult;
 
-  if (!parsed.verdict || typeof parsed.score !== "number") {
+  if (!parsed.verdict) {
     throw new Error("Réponse IA malformée.");
   }
 
   return {
     verdict: parsed.verdict,
-    score: Math.max(0, Math.min(100, Math.round(parsed.score))),
     confidence: parsed.confidence ?? "MOYENNE",
     redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags : [],
     checklist: Array.isArray(parsed.checklist) ? parsed.checklist : [],

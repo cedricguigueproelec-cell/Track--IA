@@ -32,10 +32,7 @@ export default async function HistoriquePage() {
                 </p>
               </div>
               {r.status === "DONE" ? (
-                <div className="flex items-center gap-3">
-                  {r.score != null && <span className="text-sm text-muted">{r.score}/100</span>}
-                  <VerdictBadge verdict={r.verdict ?? "INDETERMINE"} size="sm" />
-                </div>
+                <VerdictBadge verdict={r.verdict ?? "INDETERMINE"} size="sm" />
               ) : r.status === "ERROR" ? (
                 <span className="text-xs text-danger">Échec</span>
               ) : (

@@ -14,7 +14,7 @@ const STEPS = [
   {
     icon: FileCheck2,
     title: "3. Recevez votre rapport",
-    text: "Verdict, score de fiabilité, niveau de confiance et points de vigilance détaillés. Avec le forfait SNIPER : prix de revente + annonce Vinted prête à publier.",
+    text: "Réponse claire (oui ou non), niveau de confiance et points de vigilance détaillés. Avec le forfait SNIPER : prix de revente + annonce Vinted prête à publier.",
   },
 ];
 
