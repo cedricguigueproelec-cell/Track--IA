@@ -3,7 +3,8 @@
     Optimisation complète du PC pour Fortnite : ping, latence (input lag), FPS.
 
 .DESCRIPTION
-    Version 2. Menu par catégories + un bouton « TOUT OPTIMISER ».
+    Version 3. Menu par catégories + un bouton « TOUT OPTIMISER » + un
+    « MODE PARTIE » à lancer avant chaque session (ping au minimum).
 
     N'applique que des réglages documentés et 100 % réversibles : chaque valeur
     est sauvegardée AVANT d'être modifiée, et l'option « Restaurer » remet tout
@@ -15,14 +16,14 @@
       - à l'antivirus, au pare-feu ni aux mises à jour de sécurité.
 
 .PARAMETER Action
-    Menu (défaut), Tout, Connexion, Latence, Fps, Fortnite, Pc, Diagnostic, Restaurer.
+    Menu (défaut), Tout, Partie, Connexion, Latence, Fps, Fortnite, Pc, Diagnostic, Restaurer.
 
 .EXAMPLE
-    Double-clic sur LANCER.bat (recommandé).
+    Double-clic sur LANCER.bat (menu) ou MODE-PARTIE.bat (avant de jouer).
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Menu', 'Tout', 'Connexion', 'Latence', 'Fps', 'Fortnite', 'Pc', 'Diagnostic', 'Restaurer')]
+    [ValidateSet('Menu', 'Tout', 'Partie', 'Connexion', 'Latence', 'Fps', 'Fortnite', 'Pc', 'Diagnostic', 'Restaurer')]
     [string]$Action = 'Menu'
 )
 
@@ -39,6 +40,28 @@ $script:GuidHautesPerf    = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'  # Performanc
 $script:CleHvci           = 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity'
 $script:NomQos            = 'Fortnite - priorite reseau'
 $script:ExeFortnite       = 'FortniteClient-Win64-Shipping.exe'
+$script:FichierPartie     = Join-Path $script:DossierSauvegarde 'mode-partie.json'
+$script:TachePartie       = 'FortniteOpti - reactiver la recherche Wi-Fi'
+
+# Applis qui utilisent la connexion en fond (nom du processus = nom affiché).
+$script:AppsGourmandes = [ordered]@{
+    'OneDrive'        = 'OneDrive (synchro de fichiers)'
+    'Dropbox'         = 'Dropbox (synchro de fichiers)'
+    'GoogleDriveFS'   = 'Google Drive (synchro de fichiers)'
+    'iCloudDrive'     = 'iCloud Drive (synchro de fichiers)'
+    'MEGAsync'        = 'MEGA (synchro de fichiers)'
+    'qbittorrent'     = 'qBittorrent (torrents)'
+    'uTorrent'        = 'µTorrent (torrents)'
+    'BitTorrent'      = 'BitTorrent (torrents)'
+    'transmission-qt' = 'Transmission (torrents)'
+    'steam'           = 'Steam (ses téléchargements ne s''arrêtent pas pendant Fortnite)'
+    'EADesktop'       = 'EA app (téléchargements)'
+    'Battle.net'      = 'Battle.net (téléchargements)'
+    'upc'             = 'Ubisoft Connect (téléchargements)'
+    'GalaxyClient'    = 'GOG Galaxy (téléchargements)'
+}
+# Celles-ci tournent normalement en permanence : on les relance à la fin de la partie.
+$script:AppsARelancer = @('OneDrive', 'Dropbox', 'GoogleDriveFS', 'iCloudDrive', 'MEGAsync')
 
 $script:Sauvegarde = New-Object System.Collections.ArrayList
 $script:DejaSauve  = @{}
@@ -49,10 +72,11 @@ $script:ChoixGraphismes = $null
 $script:DetailsConnexion = @(
     'Carte réseau : économies d''énergie coupées (Green Ethernet, EEE, ULP...)'
     'Carte réseau : chaque paquet traité tout de suite (pas de regroupement ni de modération)'
-    'Wi-Fi : moins de recherches de borne en arrière-plan (= moins de pics de ping)'
+    'Wi-Fi : moins de recherches de borne en arrière-plan + préférence pour le 5 GHz'
     'Paquets de Fortnite marqués prioritaires (QoS)'
     'Bridage réseau de Windows désactivé'
     'Windows n''utilise plus ta connexion pour envoyer des mises à jour à d''autres PC'
+    'Mises à jour Windows en arrière-plan limitées à 20 % de ta connexion'
 )
 $script:DetailsLatence = @(
     'Accélération de la souris Windows coupée (mouvement 1:1)'
@@ -101,7 +125,7 @@ function Write-Section([string]$Texte) {
 function Write-Banniere {
     Write-Host ''
     Write-Host '  ==================================================' -ForegroundColor Magenta
-    Write-Host '     OPTIMISATION FORTNITE v2  -  ping / latence / FPS' -ForegroundColor Magenta
+    Write-Host '     OPTIMISATION FORTNITE v3  -  ping / latence / FPS' -ForegroundColor Magenta
     Write-Host '  ==================================================' -ForegroundColor Magenta
     Write-Host ''
 }
@@ -374,6 +398,7 @@ function Set-CarteReseau {
         '*PacketCoalescing'    = '0'  # regroupe les paquets pour économiser -> délai
         '*InterruptModeration' = '0'  # traite chaque paquet tout de suite
         'RoamAggressiveness'   = '0'  # Wi-Fi Intel : moins de scans de bornes -> moins de pics
+        'RoamingPreferredBandType' = '2'  # Wi-Fi Intel : préférer le 5 GHz (moins encombré)
     }
 
     foreach ($carte in $cartes) {
@@ -386,6 +411,8 @@ function Set-CarteReseau {
             $valeurActuelle = [string](@($p.RegistryValue)[0])
             if ($valeurActuelle -eq $voulu) { continue }
             if ($p.ValidRegistryValues -and (@($p.ValidRegistryValues) -notcontains $voulu)) { continue }
+            # Ne remplace pas une préférence déjà réglée sur le 6 GHz (Wi-Fi 6E/7).
+            if ($motCle -eq 'RoamingPreferredBandType' -and @('0', '1') -notcontains $valeurActuelle) { continue }
             try {
                 Add-Entree -Id "NIC|$($carte.Name)|$motCle" -Kind 'Nic' -Path $carte.Name -Name $motCle -Value $valeurActuelle
                 Set-NetAdapterAdvancedProperty -Name $carte.Name -RegistryKeyword $motCle -RegistryValue $voulu -NoRestart -Confirm:$false
@@ -428,6 +455,149 @@ function Set-PartageMisesAJour {
     Set-ValeurRegistre -Path $cle -Name 'DownloadMode' -Value 0
     Write-Ok 'Windows n''envoie plus de morceaux de mises à jour à d''autres PC par ta connexion.'
     Write-Info '(Ça saturait ton envoi = pics de ping. Les mises à jour, elles, continuent normalement.)'
+
+    $politique = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization'
+    Set-ValeurRegistre -Path $politique -Name 'DOPercentageMaxBackgroundBandwidth' -Value 20
+    Write-Ok 'Mises à jour Windows en arrière-plan limitées à 20 % de ta connexion.'
+    Write-Info '(Windows Update peut afficher « certains paramètres sont gérés par votre organisation » : c''est ce réglage.)'
+}
+
+# ---------------------------------------------------------------------------
+# MODE PARTIE (le temps d'une session, puis tout revient à la normale)
+# ---------------------------------------------------------------------------
+function Test-EstWifi($Carte) {
+    return (([string]$Carte.PhysicalMediaType -match '802\.11') -or
+            ([string]$Carte.InterfaceDescription -match 'Wi-?Fi|Wireless|WLAN|802\.11'))
+}
+
+# Cartes Wi-Fi actives, seulement si aucun câble Ethernet n'est branché.
+function Get-WifiSeul {
+    $actives = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })
+    if (@($actives | Where-Object { -not (Test-EstWifi $_) }).Count -gt 0) { return }
+    foreach ($c in $actives) { if (Test-EstWifi $c) { $c.Name } }
+}
+
+function Test-PartieActive {
+    if (-not (Test-Path -LiteralPath $script:FichierPartie)) { return $false }
+    try {
+        $etat = Get-Content -LiteralPath $script:FichierPartie -Raw -Encoding UTF8 | ConvertFrom-Json
+        $p = Get-Process -Id ([int]$etat.Pid) -ErrorAction SilentlyContinue
+        return [bool]($p -and $p.ProcessName -match 'powershell|pwsh')
+    } catch { return $false }
+}
+
+function Close-Appli([string]$NomProcessus) {
+    if ($NomProcessus -eq 'steam') {
+        $p = Get-Process -Name 'steam' -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($p -and $p.Path) { try { Start-Process -FilePath $p.Path -ArgumentList '-shutdown' } catch { } }
+    } else {
+        [void](Invoke-Natif 'taskkill.exe' @('/IM', "$NomProcessus.exe"))
+    }
+    for ($i = 0; $i -lt 20; $i++) {
+        if (-not (Get-Process -Name $NomProcessus -ErrorAction SilentlyContinue)) { return }
+        Start-Sleep -Milliseconds 500
+    }
+    Get-Process -Name $NomProcessus -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
+function Register-SecoursWifi([string[]]$Interfaces) {
+    $commandes = ($Interfaces | ForEach-Object { "netsh wlan set autoconfig enabled=yes interface=`"$_`"" }) -join ' & '
+    $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $commandes"
+    $declencheurs = @((New-ScheduledTaskTrigger -AtStartup), (New-ScheduledTaskTrigger -AtLogOn))
+    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    Register-ScheduledTask -TaskName $script:TachePartie -Action $action -Trigger $declencheurs -Principal $principal -Force | Out-Null
+}
+
+function Stop-ModePartie([switch]$Silencieux) {
+    if (-not (Test-Path -LiteralPath $script:FichierPartie)) { return }
+    $etat = Get-Content -LiteralPath $script:FichierPartie -Raw -Encoding UTF8 | ConvertFrom-Json
+
+    foreach ($nom in @($etat.Wifi)) {
+        if (-not $nom) { continue }
+        $r = Invoke-Natif 'netsh.exe' @('wlan', 'set', 'autoconfig', 'enabled=yes', "interface=$nom")
+        if ($r.Code -eq 0) { Write-Ok "Wi-Fi « $nom » : recherche de réseaux réactivée." }
+        else { Write-Attention "Wi-Fi « $nom » : $($r.Texte)" }
+    }
+    try { Unregister-ScheduledTask -TaskName $script:TachePartie -Confirm:$false -ErrorAction Stop } catch { }
+
+    if (-not $Silencieux) {
+        foreach ($app in @($etat.Apps)) {
+            if (-not $app -or -not $app.Chemin -or -not $app.Relancer) { continue }
+            if (-not (Test-Path -LiteralPath $app.Chemin)) { continue }
+            # Via l'explorateur : l'appli repart SANS droits administrateur, comme d'habitude.
+            try { Start-Process -FilePath 'explorer.exe' -ArgumentList "`"$($app.Chemin)`""; Write-Ok "$($app.Nom) relancé." } catch { }
+        }
+    }
+    Remove-Item -LiteralPath $script:FichierPartie -Force -ErrorAction SilentlyContinue
+}
+
+function Start-ModePartie {
+    Write-Section 'MODE PARTIE : ping au minimum pendant que tu joues'
+    if (Test-PartieActive) { Write-Attention 'Le mode partie est déjà actif dans une autre fenêtre.'; return }
+    Stop-ModePartie -Silencieux   # restes d'une session mal fermée
+
+    if (-not (Test-Path -LiteralPath $script:DossierSauvegarde)) {
+        New-Item -ItemType Directory -Path $script:DossierSauvegarde -Force | Out-Null
+    }
+    $etat = [ordered]@{ Pid = $PID; Wifi = @(); Apps = @() }
+
+    # 1. Applis qui utilisent la connexion en fond
+    Write-Titre 'Applis qui utilisent ta connexion en fond'
+    $trouvees = @()
+    foreach ($nom in $script:AppsGourmandes.Keys) {
+        $p = Get-Process -Name $nom -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($p) { $trouvees += [pscustomobject]@{ Processus = $nom; Nom = $script:AppsGourmandes[$nom]; Chemin = [string]$p.Path } }
+    }
+    if ($trouvees.Count -eq 0) {
+        Write-Ok 'Aucune appli gourmande ouverte.'
+    } else {
+        foreach ($a in $trouvees) { Write-Info "- $($a.Nom)" }
+        if (Read-Oui 'Les fermer pendant la partie (la synchro de fichiers sera relancée à la fin) ?') {
+            foreach ($a in $trouvees) {
+                Close-Appli $a.Processus
+                Write-Ok "$($a.Nom) fermé."
+                $etat['Apps'] += [pscustomobject]@{
+                    Nom = $a.Nom; Chemin = $a.Chemin; Relancer = ($script:AppsARelancer -contains $a.Processus)
+                }
+            }
+        }
+    }
+
+    # 2. Windows Update : téléchargements arrêtés pour la session
+    Write-Titre 'Windows Update'
+    foreach ($service in @('wuauserv', 'DoSvc', 'BITS')) {
+        try { Stop-Service -Name $service -Force -ErrorAction Stop } catch { }
+    }
+    Write-Ok 'Téléchargements de mises à jour arrêtés pour la session (Windows les reprendra plus tard).'
+
+    # 3. Wi-Fi : plus de recherche de réseaux en arrière-plan
+    $wifi = @(Get-WifiSeul)
+    if ($wifi.Count -gt 0) {
+        Write-Titre 'Wi-Fi'
+        Write-Info 'Toutes les ~60 s, Windows cherche d''autres réseaux Wi-Fi : ça crée un pic de ping régulier.'
+        try { Register-SecoursWifi $wifi } catch { Write-Attention "Sécurité de réactivation non créée : $($_.Exception.Message)" }
+        foreach ($nom in $wifi) {
+            $r = Invoke-Natif 'netsh.exe' @('wlan', 'set', 'autoconfig', 'enabled=no', "interface=$nom")
+            if ($r.Code -eq 0) { $etat['Wifi'] += $nom; Write-Ok "Wi-Fi « $nom » : recherche en arrière-plan coupée (tu restes connecté)." }
+            else { Write-Attention "Wi-Fi « $nom » : $($r.Texte)" }
+        }
+        Write-Attention 'Le vrai remède reste un câble Ethernet : le Wi-Fi aura toujours plus de pics.'
+    }
+
+    $json = ConvertTo-Json -InputObject $etat -Depth 4
+    [System.IO.File]::WriteAllText($script:FichierPartie, $json, (New-Object System.Text.UTF8Encoding($false)))
+
+    Write-Host ''
+    Write-Host '  ================ MODE PARTIE ACTIF ================' -ForegroundColor Green
+    Write-Info 'Lance Fortnite et joue. Laisse cette fenêtre ouverte (tu peux la réduire).'
+    Write-Info 'Pour la meilleure connexion : personne ne télécharge / ne regarde de vidéo 4K'
+    Write-Info 'pendant ta partie, et la TV Freebox éteinte si tu sens plus de lag quand elle tourne.'
+    Write-Host ''
+    Read-Host '  Quand tu as FINI de jouer, appuie sur Entrée ici pour tout remettre' | Out-Null
+
+    Write-Titre 'Fin de partie'
+    Stop-ModePartie
+    Write-Ok 'Tout est revenu à la normale.'
 }
 
 # ---------------------------------------------------------------------------
@@ -782,7 +952,9 @@ function Show-Fin {
     Write-Host ''
     Write-Host '  ==================== TERMINÉ ====================' -ForegroundColor Green
     Write-Info "Réglages d'origine sauvegardés dans : $script:DossierSauvegarde"
-    Write-Info 'Pour tout annuler : relance LANCER.bat et choisis « 8. Restaurer ».'
+    Write-Info 'Pour tout annuler : relance LANCER.bat et choisis « 9. Restaurer ».'
+    Write-Host ''
+    Write-Attention 'AVANT CHAQUE SESSION : double-clic sur MODE-PARTIE.bat (ping au minimum pendant la partie).'
     Write-Host ''
     Write-Attention 'Ce qu''AUCUN logiciel ne peut faire à ta place (et c''est là que se joue le ping) :'
     Write-Info ' - un câble Ethernet entre le PC et la box (le Wi-Fi = pics de ping)'
@@ -836,6 +1008,10 @@ function Invoke-Tout {
 # Restauration
 # ---------------------------------------------------------------------------
 function Invoke-Restauration {
+    if ((Test-Path -LiteralPath $script:FichierPartie) -and -not (Test-PartieActive)) {
+        Write-Titre 'Mode partie'
+        Stop-ModePartie -Silencieux
+    }
     Read-Sauvegarde
     if ($script:Sauvegarde.Count -eq 0) { Write-Attention 'Aucune sauvegarde trouvée : rien à restaurer.'; return }
     if (-not (Read-Oui 'Remettre TOUS les réglages comme avant ?')) { return }
@@ -1076,6 +1252,7 @@ function Invoke-Diagnostic {
 function Invoke-Choix([string]$Choix) {
     switch ($Choix) {
         'Tout'       { Invoke-Tout }
+        'Partie'     { Start-ModePartie }
         'Connexion'  { Invoke-Application 'CONNEXION : réduire le ping et les pics de lag' $script:DetailsConnexion { Invoke-SectionConnexion } $true }
         'Latence'    { Invoke-Application 'LATENCE : supprimer le délai (input lag)' $script:DetailsLatence { Invoke-SectionLatence } $false }
         'Fps'        { Invoke-Application 'FPS : plus d''images par seconde' $script:DetailsFps { Invoke-SectionFps } $false }
@@ -1087,20 +1264,21 @@ function Invoke-Choix([string]$Choix) {
 }
 
 function Show-Menu {
-    $correspondance = @{ '1' = 'Tout'; '2' = 'Connexion'; '3' = 'Latence'; '4' = 'Fps'; '5' = 'Fortnite'; '6' = 'Pc'; '7' = 'Diagnostic'; '8' = 'Restaurer' }
+    $correspondance = @{ '1' = 'Tout'; '2' = 'Partie'; '3' = 'Connexion'; '4' = 'Latence'; '5' = 'Fps'; '6' = 'Fortnite'; '7' = 'Pc'; '8' = 'Diagnostic'; '9' = 'Restaurer' }
     while ($true) {
         Clear-Host
         Write-Banniere
-        Write-Host '   1. TOUT OPTIMISER EN UN CLIC  (recommandé)' -ForegroundColor Green
+        Write-Host '   1. TOUT OPTIMISER EN UN CLIC  (à faire une fois)' -ForegroundColor Green
+        Write-Host '   2. MODE PARTIE  (avant chaque session : ping au minimum)' -ForegroundColor Green
         Write-Host ''
-        Write-Host '   2. Connexion  : réduire le ping et les pics de lag'
-        Write-Host '   3. Latence    : supprimer le délai (input lag)'
-        Write-Host '   4. FPS        : plus d''images par seconde, plus stables'
-        Write-Host '   5. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)'
-        Write-Host '   6. PC complet : Windows plus léger + nettoyage'
+        Write-Host '   3. Connexion  : réduire le ping et les pics de lag'
+        Write-Host '   4. Latence    : supprimer le délai (input lag)'
+        Write-Host '   5. FPS        : plus d''images par seconde, plus stables'
+        Write-Host '   6. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)'
+        Write-Host '   7. PC complet : Windows plus léger + nettoyage'
         Write-Host ''
-        Write-Host '   7. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes'
-        Write-Host '   8. Restaurer  : tout remettre comme avant'
+        Write-Host '   8. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes'
+        Write-Host '   9. Restaurer  : tout remettre comme avant'
         Write-Host '   0. Quitter'
         Write-Host ''
         $choix = "$(Read-Host '  Ton choix')".Trim()
@@ -1132,7 +1310,12 @@ if (-not (Test-Admin)) {
     exit
 }
 
-try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v2' } catch { }
+try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v3' } catch { }
+
+# Mode partie mal fermé (fenêtre fermée, PC redémarré) : on remet le Wi-Fi normal.
+if ($Action -ne 'Partie' -and (Test-Path -LiteralPath $script:FichierPartie) -and -not (Test-PartieActive)) {
+    try { Stop-ModePartie -Silencieux } catch { }
+}
 
 if ($Action -eq 'Menu') {
     Show-Menu

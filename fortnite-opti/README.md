@@ -1,4 +1,4 @@
-# Optimisation Fortnite v2 : ping, latence, FPS
+# Optimisation Fortnite v3 : ping, latence, FPS
 
 Un outil Windows **en un clic**, **sûr et 100 % réversible**, plus le guide des réglages
 qui comptent vraiment pour réduire le délai entre ton clic et l'action à l'écran.
@@ -32,25 +32,27 @@ sans pertes, et un input lag au plancher.
 1. Télécharge le zip, puis **clic droit dessus > Propriétés > coche « Débloquer »**, puis extrais-le.
 2. Ferme Fortnite.
 3. Double-clic sur **`LANCER.bat`**, puis réponds **Oui** à la fenêtre administrateur.
-4. (Conseillé) **7. Diagnostic** pour voir ton point de départ.
-5. **1. TOUT OPTIMISER**. L'outil te pose **2 questions** (voir plus bas), puis fait tout seul.
+4. (Conseillé) **8. Diagnostic** pour voir ton point de départ.
+5. **1. TOUT OPTIMISER** (une seule fois). L'outil te pose **2 questions** (voir plus bas), puis fait tout seul.
 6. **Redémarre le PC** (l'outil te le propose).
+7. **Avant chaque session de jeu : double-clic sur `MODE-PARTIE.bat`** (voir plus bas).
 
 ```
-   1. TOUT OPTIMISER EN UN CLIC  (recommandé)
+   1. TOUT OPTIMISER EN UN CLIC  (à faire une fois)
+   2. MODE PARTIE  (avant chaque session : ping au minimum)
 
-   2. Connexion  : réduire le ping et les pics de lag
-   3. Latence    : supprimer le délai (input lag)
-   4. FPS        : plus d'images par seconde, plus stables
-   5. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)
-   6. PC complet : Windows plus léger + nettoyage
+   3. Connexion  : réduire le ping et les pics de lag
+   4. Latence    : supprimer le délai (input lag)
+   5. FPS        : plus d'images par seconde, plus stables
+   6. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)
+   7. PC complet : Windows plus léger + nettoyage
 
-   7. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes
-   8. Restaurer  : tout remettre comme avant
+   8. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes
+   9. Restaurer  : tout remettre comme avant
    0. Quitter
 ```
 
-**Pour tout annuler : 8. Restaurer.** Chaque valeur d'origine est sauvegardée dans
+**Pour tout annuler : 9. Restaurer.** Chaque valeur d'origine est sauvegardée dans
 `C:\Users\<toi>\FortniteOpti-Sauvegarde\` avant d'être modifiée, et un point de
 restauration Windows « Avant optimisation Fortnite » est créé en plus.
 
@@ -65,20 +67,43 @@ restauration Windows « Avant optimisation Fortnite » est créé en plus.
 
 ---
 
-## 2. Ce que fait chaque catégorie
+## 2. Le Mode Partie (avant chaque session)
 
-### 2. Connexion : ping et pics de lag
+Double-clic sur **`MODE-PARTIE.bat`** (ou choix **2** du menu), puis lance Fortnite.
+**Laisse la fenêtre ouverte** (réduite) pendant que tu joues ; quand tu as fini, reviens
+dessus et appuie sur **Entrée** : tout revient à la normale.
+
+Pendant la session :
+
+| Action | Pourquoi | Gain |
+|---|---|---|
+| Ferme les applis qui utilisent ta connexion en fond (OneDrive, Google Drive, Dropbox, torrents, Steam, EA app, Battle.net, Ubisoft Connect...) | Une synchro ou un téléchargement sature la connexion = pics de ping. Steam ne met **pas** ses téléchargements en pause pour Fortnite | **Énorme** si une de ces applis tournait |
+| Arrête les téléchargements de Windows Update | Pas de mise à jour de 3 Go qui démarre en pleine partie | Moyen à énorme |
+| **En Wi-Fi :** coupe la recherche de réseaux en arrière-plan (tu restes connecté) | Windows cherche d'autres réseaux toutes les ~60 s, ce qui crée un pic de ping régulier | **Gros** en Wi-Fi |
+
+À la fin, la synchro de fichiers (OneDrive...) est relancée et le Wi-Fi remis comme avant.
+**Sécurité :** si tu fermes la fenêtre ou redémarres le PC sans appuyer sur Entrée, le Wi-Fi
+est remis automatiquement au prochain démarrage (et au prochain lancement de l'outil).
+Pendant le Mode Partie en Wi-Fi, si la connexion coupe, elle ne se rétablit pas toute seule :
+appuie sur Entrée dans la fenêtre.
+
+---
+
+## 3. Ce que fait chaque catégorie
+
+### Connexion : ping et pics de lag
 
 | Réglage | Pourquoi | Gain |
 |---|---|---|
 | Économies d'énergie de la carte réseau coupées (Green Ethernet, EEE, ULP) | Elles mettent la carte en veille entre deux paquets | Faible à moyen |
 | Regroupement et modération des paquets coupés | Chaque paquet est traité tout de suite au lieu d'attendre | Faible (quelques dizaines de µs) |
-| Wi-Fi Intel : recherche de bornes au minimum | Les scans en arrière-plan créent des pics réguliers | Moyen **en Wi-Fi** |
+| Wi-Fi Intel : recherche de bornes au minimum + préférence pour le 5 GHz | Les scans créent des pics réguliers ; le 5 GHz est moins encombré | Moyen **en Wi-Fi** |
 | Paquets de Fortnite marqués prioritaires (QoS, DSCP 46) | Priorité en Wi-Fi et sur les box qui gèrent la QoS | Faible à moyen selon la box |
 | Bridage réseau de Windows coupé | Windows bride le réseau quand de la musique/vidéo tourne | Faible |
 | Windows n'envoie plus de mises à jour à d'autres PC | Ça pouvait saturer ton envoi = pics de ping | Moyen si c'était actif |
+| Mises à jour Windows en arrière-plan limitées à 20 % de ta connexion | Une mise à jour ne peut plus saturer ta ligne | Moyen |
 
-### 3. Latence : délai / input lag
+### Latence : délai / input lag
 
 | Réglage | Pourquoi | Gain |
 |---|---|---|
@@ -89,7 +114,7 @@ restauration Windows « Avant optimisation Fortnite » est créé en plus.
 | Priorité maximale aux jeux (planificateur multimédia) | Plus de temps CPU/GPU pour le jeu | Faible |
 | Mise en veille PCI Express et USB coupée | La carte graphique, le réseau et la souris ne s'endorment plus | Faible à moyen |
 
-### 4. FPS
+### FPS
 
 | Réglage | Pourquoi | Gain |
 |---|---|---|
@@ -99,7 +124,7 @@ restauration Windows « Avant optimisation Fortnite » est créé en plus.
 | Fortnite forcé sur la carte graphique dédiée | Indispensable sur PC portable | Énorme sur portable |
 | Intégrité de la mémoire (option) | Voir les 2 questions plus haut | +5 à 10 % |
 
-### 5. Fortnite (fichier de réglages du jeu)
+### Fortnite (fichier de réglages du jeu)
 
 L'outil modifie **uniquement le fichier de réglages** (`GameUserSettings.ini`), exactement
 comme le menu Paramètres du jeu. Aucun fichier du jeu, aucun risque avec l'anti-cheat.
@@ -111,7 +136,7 @@ comme le menu Paramètres du jeu. Aucun fichier du jeu, aucun risque avec l'anti
 
 Fortnite doit avoir été lancé au moins une fois, et être **fermé** pendant l'opération.
 
-### 6. PC complet
+### PC complet
 
 | Réglage | Pourquoi | Gain |
 |---|---|---|
@@ -139,7 +164,7 @@ Beaucoup de « packs de tweaks » sur YouTube font plus de mal que de bien :
 
 ---
 
-## 3. À vérifier une fois dans Fortnite
+## 4. À vérifier une fois dans Fortnite
 
 **Paramètres > Vidéo :**
 
@@ -162,7 +187,7 @@ Beaucoup de « packs de tweaks » sur YouTube font plus de mal que de bien :
 
 ---
 
-## 4. Réglages de la carte graphique
+## 5. Réglages de la carte graphique
 
 ### NVIDIA (Panneau de configuration NVIDIA > Gérer les paramètres 3D > Fortnite)
 - Mode de gestion de l'alimentation : **Performances maximales préférées**
@@ -184,7 +209,7 @@ Mets le pilote graphique à jour une fois par mois (NVIDIA App ou AMD Adrenalin)
 
 ---
 
-## 5. Réseau : le seul vrai levier sur le ping
+## 6. Réseau : le seul vrai levier sur le ping
 
 1. **Câble Ethernet (RJ45) entre le PC et la box.** Changement n°1 : le Wi-Fi crée des pics
    et de la gigue. Un câble Cat 6 de 10-15 m coûte moins de 10 €. Sinon : Wi-Fi **5 GHz**
@@ -197,9 +222,23 @@ Mets le pilote graphique à jour une fois par mois (NVIDIA App ou AMD Adrenalin)
 5. **Pas de VPN** : ça ajoute un détour, donc du ping.
 6. **Fibre > ADSL > 4G/5G** : le meilleur investissement possible pour le ping.
 
+### Spécial Freebox Pop
+
+- **La Freebox Pop ne permet pas de mettre ton PC en priorité** : pas de QoS réglable ni de
+  « mode gaming ». La seule priorité qu'elle gère, c'est sa TV.
+- **Branche ton PC en Ethernet** directement sur un port libre de la Freebox.
+- **TV Freebox :** si tu sens plus de lag quand elle tourne, éteins-la pendant tes parties.
+- **Partie importante :** l'appli **Freebox Connect** (ou `mafreebox.freebox.fr` > contrôle
+  parental) permet de **mettre en pause Internet** sur les autres appareils. À faire avec
+  l'accord des autres, évidemment.
+- **En fibre**, la ligne est très large : fais le test bufferbloat ci-dessus pendant que les
+  autres utilisent Internet. Si la note est A ou B, le partage n'est pas ton problème.
+- **Option avancée :** un routeur gaming derrière la box (ASUS, TP-Link... avec priorité par
+  appareil), mais ça ne marche que si les autres appareils passent par lui.
+
 ---
 
-## 6. Matériel
+## 7. Matériel
 
 - **Écran** : à sa fréquence max (le diagnostic te le dit). Un écran 144 Hz réglé à 60 Hz est
   une erreur très fréquente. Active le mode jeu / overdrive de l'écran.
@@ -214,6 +253,7 @@ Mets le pilote graphique à jour une fois par mois (NVIDIA App ou AMD Adrenalin)
 ## Checklist rapide
 
 - [ ] `LANCER.bat` > **1. TOUT OPTIMISER** + PC redémarré
+- [ ] **`MODE-PARTIE.bat` avant chaque session**
 - [ ] Câble Ethernet
 - [ ] Écran à sa fréquence max
 - [ ] Fortnite : Mode de rendu Performance, Reflex « Activé + Boost »
