@@ -1,42 +1,87 @@
 ﻿<#
 .SYNOPSIS
-    Optimisation Windows pour Fortnite : moins d'input lag, FPS plus stables,
-    connexion plus propre.
+    Optimisation complète du PC pour Fortnite : ping, latence (input lag), FPS.
 
 .DESCRIPTION
-    N'applique que des réglages documentés, sans danger et 100 % réversibles :
-    chaque valeur est sauvegardée AVANT d'être modifiée, et l'option
-    « Restaurer » remet tout exactement comme avant.
+    Version 2. Menu par catégories + un bouton « TOUT OPTIMISER ».
+
+    N'applique que des réglages documentés et 100 % réversibles : chaque valeur
+    est sauvegardée AVANT d'être modifiée, et l'option « Restaurer » remet tout
+    exactement comme avant. Un point de restauration Windows est aussi créé.
 
     Ce script ne touche PAS :
-      - aux fichiers du jeu ni à l'anti-cheat (Easy Anti-Cheat) -> aucun risque de ban ;
-      - à la sécurité de Windows (Defender, pare-feu, mises à jour, mitigations CPU).
+      - aux fichiers du jeu ni à l'anti-cheat (Easy Anti-Cheat) -> aucun risque de ban
+        (seul le fichier de RÉGLAGES de Fortnite est modifié, comme le ferait le menu du jeu) ;
+      - à l'antivirus, au pare-feu ni aux mises à jour de sécurité.
 
 .PARAMETER Action
-    Menu (par défaut), Appliquer, Restaurer ou Diagnostic.
+    Menu (défaut), Tout, Connexion, Latence, Fps, Fortnite, Pc, Diagnostic, Restaurer.
 
 .EXAMPLE
     Double-clic sur LANCER.bat (recommandé).
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('Menu', 'Appliquer', 'Restaurer', 'Diagnostic')]
+    [ValidateSet('Menu', 'Tout', 'Connexion', 'Latence', 'Fps', 'Fortnite', 'Pc', 'Diagnostic', 'Restaurer')]
     [string]$Action = 'Menu'
 )
 
 $ErrorActionPreference = 'Stop'
 
 # ---------------------------------------------------------------------------
-# Constantes
+# Constantes et état
 # ---------------------------------------------------------------------------
 $script:DossierSauvegarde = Join-Path $env:USERPROFILE 'FortniteOpti-Sauvegarde'
 $script:FichierSauvegarde = Join-Path $script:DossierSauvegarde 'sauvegarde.json'
 $script:RegexGuid         = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 $script:GuidUltimate      = 'e9a42b02-d5df-448d-aa00-03f14749eb61'  # Performances optimales
 $script:GuidHautesPerf    = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'  # Performances élevées
+$script:CleHvci           = 'HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity'
+$script:NomQos            = 'Fortnite - priorite reseau'
+$script:ExeFortnite       = 'FortniteClient-Win64-Shipping.exe'
 
 $script:Sauvegarde = New-Object System.Collections.ArrayList
 $script:DejaSauve  = @{}
+$script:PointRestaurationFait = $false
+$script:ChoixHVCI = $null
+$script:ChoixGraphismes = $null
+
+$script:DetailsConnexion = @(
+    'Carte réseau : économies d''énergie coupées (Green Ethernet, EEE, ULP...)'
+    'Carte réseau : chaque paquet traité tout de suite (pas de regroupement ni de modération)'
+    'Wi-Fi : moins de recherches de borne en arrière-plan (= moins de pics de ping)'
+    'Paquets de Fortnite marqués prioritaires (QoS)'
+    'Bridage réseau de Windows désactivé'
+    'Windows n''utilise plus ta connexion pour envoyer des mises à jour à d''autres PC'
+)
+$script:DetailsLatence = @(
+    'Accélération de la souris Windows coupée (mouvement 1:1)'
+    'Raccourcis « touches rémanentes » coupés (plus de pop-up en pleine partie avec Maj)'
+    'Planification GPU accélérée par le matériel activée'
+    'Optimisations pour les jeux fenêtrés (Windows 11)'
+    'Priorité CPU/GPU aux jeux dans le planificateur multimédia'
+    'Mise en veille du PCI Express et de l''USB coupée (souris, carte graphique, réseau)'
+)
+$script:DetailsFps = @(
+    'Plan d''alimentation hautes performances (sauf Ryzen X3D)'
+    'Mode Jeu activé + enregistrement vidéo Game Bar en arrière-plan coupé'
+    'Fortnite forcé sur la carte graphique dédiée'
+    'OPTION (on te demande) : intégrité de la mémoire désactivée = + de FPS, - de sécurité'
+)
+$script:DetailsFortnite = @(
+    'Plein écran, V-Sync coupée, flou de mouvement coupé, compteur de FPS'
+    'NVIDIA Reflex « Activé + Boost » (cartes NVIDIA)'
+    'Limite de FPS jamais en dessous de la fréquence de ton écran'
+    'OPTION (on te demande) : graphismes compétitifs (ombres/effets au minimum)'
+)
+$script:DetailsPc = @(
+    'Applications en arrière-plan coupées'
+    'Transparence et animations de Windows coupées'
+    'Démarrage rapide coupé (Windows repart propre à chaque démarrage)'
+    'Service de télémétrie Microsoft coupé'
+    'Nettoyage des fichiers temporaires (les caches de shaders sont gardés)'
+    'Liste des programmes qui se lancent avec Windows'
+)
 
 # ---------------------------------------------------------------------------
 # Affichage
@@ -46,16 +91,23 @@ function Write-Ok([string]$Texte)        { Write-Host "    [OK] $Texte" -Foregro
 function Write-Info([string]$Texte)      { Write-Host "         $Texte" -ForegroundColor Gray }
 function Write-Attention([string]$Texte) { Write-Host "    [!]  $Texte" -ForegroundColor Yellow }
 
+function Write-Section([string]$Texte) {
+    Write-Host ''
+    Write-Host '  --------------------------------------------------' -ForegroundColor Magenta
+    Write-Host "   $Texte" -ForegroundColor Magenta
+    Write-Host '  --------------------------------------------------' -ForegroundColor Magenta
+}
+
 function Write-Banniere {
     Write-Host ''
     Write-Host '  ==================================================' -ForegroundColor Magenta
-    Write-Host '     OPTIMISATION FORTNITE  -  latence minimale'      -ForegroundColor Magenta
+    Write-Host '     OPTIMISATION FORTNITE v2  -  ping / latence / FPS' -ForegroundColor Magenta
     Write-Host '  ==================================================' -ForegroundColor Magenta
     Write-Host ''
 }
 
 function Read-Oui([string]$Question) {
-    $reponse = Read-Host "  $Question (O/N)"
+    $reponse = "$(Read-Host "  $Question (O/N)")"
     return ($reponse -match '^\s*[oOyY]')
 }
 
@@ -89,6 +141,26 @@ function Initialize-Natif {
 public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, int[] pvParam, uint fWinIni);
 '@
     }
+}
+
+function Test-FortniteOuvert {
+    return [bool](Get-Process -Name 'FortniteClient-Win64-Shipping' -ErrorAction SilentlyContinue)
+}
+
+function Test-CarteNvidia {
+    try {
+        return (@(Get-CimInstance -ClassName Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' }).Count -gt 0)
+    } catch { return $false }
+}
+
+function Get-FrequenceEcran {
+    try {
+        $frequences = @(Get-CimInstance -ClassName Win32_VideoController |
+            Where-Object { $_.CurrentRefreshRate -gt 0 } | ForEach-Object { [int]$_.CurrentRefreshRate })
+        if ($frequences.Count -eq 0) { return 0 }
+        $mesure = $frequences | Measure-Object -Maximum
+        return [int]$mesure.Maximum
+    } catch { return 0 }
 }
 
 # Exécute une étape : si elle échoue, on prévient et on passe à la suivante.
@@ -176,8 +248,17 @@ function ConvertTo-ValeurTypee($Entree) {
     }
 }
 
+function New-PointRestauration {
+    if ($script:PointRestaurationFait) { return }
+    $script:PointRestaurationFait = $true
+    Invoke-Etape 'Point de restauration Windows (filet de sécurité, ~1 min)' {
+        Checkpoint-Computer -Description 'Avant optimisation Fortnite' -RestorePointType 'MODIFY_SETTINGS'
+        Write-Ok 'Point de restauration prêt (Windows n''en crée qu''un par 24 h).'
+    }
+}
+
 # ---------------------------------------------------------------------------
-# Étapes d'optimisation
+# Plan et réglages d'alimentation
 # ---------------------------------------------------------------------------
 function Get-PlanActif {
     $r = Invoke-Natif 'powercfg.exe' @('/getactivescheme')
@@ -190,6 +271,38 @@ function Test-PlanExiste([string]$Guid) {
     return ($r.Texte -match [regex]::Escape($Guid))
 }
 
+# Valeur « sur secteur » d'un réglage d'alimentation. Dans la sortie de
+# powercfg /query, les deux dernières valeurs 0x... sont : secteur, batterie.
+function Get-ValeurEnergie([string]$Plan, [string]$Groupe, [string]$Reglage) {
+    $r = Invoke-Natif 'powercfg.exe' @('/query', $Plan, $Groupe, $Reglage)
+    if ($r.Code -ne 0) { return $null }
+    $valeurs = [regex]::Matches($r.Texte, '0x([0-9a-fA-F]{8})')
+    if ($valeurs.Count -lt 2) { return $null }
+    return [Convert]::ToInt32($valeurs[$valeurs.Count - 2].Groups[1].Value, 16)
+}
+
+function Set-ValeurEnergie([string]$Groupe, [string]$Reglage, [int]$Valeur, [string]$Libelle) {
+    $plan = Get-PlanActif
+    if (-not $plan) { throw "Impossible de lire le plan d'alimentation actuel." }
+    $actuel = Get-ValeurEnergie $plan $Groupe $Reglage
+    if ($null -eq $actuel) { Write-Info "$Libelle : réglage absent sur ce PC."; return }
+    if ($actuel -eq $Valeur) { Write-Ok "$Libelle (déjà réglé)."; return }
+    Add-Entree -Id "PWRSET|$plan|$Groupe|$Reglage" -Kind 'PowerSetting' -Path $plan -Name "$Groupe|$Reglage" -Value $actuel
+    $r = Invoke-Natif 'powercfg.exe' @('/setacvalueindex', $plan, $Groupe, $Reglage, [string]$Valeur)
+    if ($r.Code -ne 0) { throw "powercfg : $($r.Texte)" }
+    [void](Invoke-Natif 'powercfg.exe' @('/setactive', $plan))
+    Write-Ok $Libelle
+}
+
+function Set-EnergieLatence {
+    # PCI Express : gestion de l'alimentation de l'état de liaison -> Désactivé
+    Set-ValeurEnergie '501a4d13-42af-4429-9fd1-a8218c268e20' 'ee12f906-d277-404b-b6da-e5fa1a576df5' 0 `
+        'PCI Express : plus de mise en veille de la liaison (carte graphique / réseau réactives)'
+    # USB : suspension sélective -> Désactivée
+    Set-ValeurEnergie '2a737441-1930-4402-8d77-b2bebba308a3' '48e6b7a6-50f5-4782-a5d4-53bb8f07e226' 0 `
+        'USB : plus de mise en veille sélective (souris / clavier toujours réveillés)'
+}
+
 function Set-PlanAlimentation {
     $cpu = ''
     try { $cpu = [string](Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1 -ExpandProperty Name) } catch { }
@@ -198,7 +311,8 @@ function Set-PlanAlimentation {
     # pour que le pilote AMD place Fortnite sur les cœurs avec le cache 3D.
     if ($cpu -match 'X3D') {
         Write-Ok "Processeur $($cpu.Trim()) détecté : on GARDE le plan « Utilisation normale »."
-        Write-Info "C'est ce plan + le Mode Jeu qui permettent à AMD de mettre Fortnite sur les bons cœurs."
+        Write-Info 'C''est ce plan + le Mode Jeu qui permettent à AMD de mettre Fortnite sur les bons cœurs.'
+        Set-EnergieLatence
         return
     }
 
@@ -226,8 +340,9 @@ function Set-PlanAlimentation {
         $cible = $script:GuidHautesPerf; $nom = 'Performances élevées'
     }
     if (-not $cible) {
-        Write-Attention "Ce PC n'expose que le plan « Utilisation normale » (fréquent sur les portables récents)."
-        Write-Info "Règle-le à la main : Paramètres > Système > Alimentation > Mode d'alimentation > « Performances optimales »."
+        Write-Attention 'Ce PC n''expose que le plan « Utilisation normale » (fréquent sur les portables récents).'
+        Write-Info 'Règle-le à la main : Paramètres > Système > Alimentation > Mode d''alimentation > « Performances optimales ».'
+        Set-EnergieLatence
         return
     }
 
@@ -235,19 +350,156 @@ function Set-PlanAlimentation {
     if ($r.Code -ne 0) { throw "powercfg n'a pas pu activer le plan : $($r.Texte)" }
     Write-Ok "Plan « $nom » activé (le processeur ne se met plus en économie pendant les combats)."
     if ($portable) {
-        Write-Attention "PC portable : joue BRANCHÉ sur secteur, sinon la carte graphique est bridée."
+        Write-Attention 'PC portable : joue BRANCHÉ sur secteur, sinon la carte graphique est bridée.'
+    }
+    Set-EnergieLatence
+}
+
+# ---------------------------------------------------------------------------
+# CONNEXION
+# ---------------------------------------------------------------------------
+function Set-CarteReseau {
+    $cartes = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })
+    if ($cartes.Count -eq 0) { Write-Info 'Aucune carte réseau active trouvée.'; return }
+
+    # Mots-clés standard des pilotes (indépendants de la langue de Windows).
+    $reglages = [ordered]@{
+        '*EEE'                 = '0'  # Energy Efficient Ethernet
+        'EEELinkAdvertisement' = '0'  # EEE (Intel)
+        'AdvancedEEE'          = '0'  # EEE avancé (Realtek)
+        'EnableGreenEthernet'  = '0'  # Green Ethernet (Realtek)
+        'GreenEthernet'        = '0'
+        'PowerSavingMode'      = '0'  # Économie d'énergie (Realtek)
+        'ULPMode'              = '0'  # Ultra Low Power (Intel)
+        '*PacketCoalescing'    = '0'  # regroupe les paquets pour économiser -> délai
+        '*InterruptModeration' = '0'  # traite chaque paquet tout de suite
+        'RoamAggressiveness'   = '0'  # Wi-Fi Intel : moins de scans de bornes -> moins de pics
+    }
+
+    foreach ($carte in $cartes) {
+        $modifiee = $false
+        $proprietes = @(Get-NetAdapterAdvancedProperty -Name $carte.Name -ErrorAction SilentlyContinue)
+        foreach ($motCle in $reglages.Keys) {
+            $voulu = $reglages[$motCle]
+            $p = $proprietes | Where-Object { $_.RegistryKeyword -eq $motCle } | Select-Object -First 1
+            if (-not $p) { continue }
+            $valeurActuelle = [string](@($p.RegistryValue)[0])
+            if ($valeurActuelle -eq $voulu) { continue }
+            if ($p.ValidRegistryValues -and (@($p.ValidRegistryValues) -notcontains $voulu)) { continue }
+            try {
+                Add-Entree -Id "NIC|$($carte.Name)|$motCle" -Kind 'Nic' -Path $carte.Name -Name $motCle -Value $valeurActuelle
+                Set-NetAdapterAdvancedProperty -Name $carte.Name -RegistryKeyword $motCle -RegistryValue $voulu -NoRestart -Confirm:$false
+                $modifiee = $true
+                Write-Ok "$($carte.Name) : « $($p.DisplayName) » réglé pour la latence."
+            } catch {
+                Write-Attention "$($carte.Name) : « $($p.DisplayName) » non modifiable ($($_.Exception.Message))."
+            }
+        }
+        if ($modifiee) {
+            Write-Info "Redémarrage de « $($carte.Name) » (coupure de quelques secondes)..."
+            Restart-NetAdapter -Name $carte.Name -Confirm:$false
+        } else {
+            Write-Ok "$($carte.Name) : déjà optimale."
+        }
     }
 }
 
+function Set-QosFortnite {
+    # Nécessaire pour que Windows applique la priorité hors réseau d'entreprise.
+    Set-ValeurRegistre -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\QoS' -Name 'Do not use NLA' -Value '1' -Type 'String'
+    $existe = $null
+    try { $existe = Get-NetQosPolicy -Name $script:NomQos -ErrorAction Stop } catch { }
+    if (-not $existe) {
+        New-NetQosPolicy -Name $script:NomQos -AppPathNameMatchCondition $script:ExeFortnite -DSCPAction 46 -NetworkProfile All | Out-Null
+        Add-Entree -Id "QOS|$($script:NomQos)" -Kind 'Qos' -Name $script:NomQos
+    }
+    Write-Ok 'Paquets de Fortnite marqués « priorité temps réel » (DSCP 46).'
+    Write-Info 'Utile surtout en Wi-Fi et avec les box qui gèrent la priorité (QoS).'
+}
+
+function Set-BridageReseau {
+    $profil = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'
+    Set-ValeurRegistre -Path $profil -Name 'NetworkThrottlingIndex' -Value -1   # 0xFFFFFFFF = aucun bridage
+    Write-Ok 'Bridage réseau de Windows désactivé (quand de la musique ou une vidéo tourne en fond).'
+}
+
+function Set-PartageMisesAJour {
+    $cle = 'Registry::HKEY_USERS\S-1-5-20\Software\Microsoft\Windows\CurrentVersion\DeliveryOptimization\Settings'
+    Set-ValeurRegistre -Path $cle -Name 'DownloadMode' -Value 0
+    Write-Ok 'Windows n''envoie plus de morceaux de mises à jour à d''autres PC par ta connexion.'
+    Write-Info '(Ça saturait ton envoi = pics de ping. Les mises à jour, elles, continuent normalement.)'
+}
+
+# ---------------------------------------------------------------------------
+# LATENCE
+# ---------------------------------------------------------------------------
+function Update-Souris {
+    Initialize-Natif
+    $p = Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Mouse'
+    $valeurs = [int[]]@([int]$p.MouseThreshold1, [int]$p.MouseThreshold2, [int]$p.MouseSpeed)
+    # SPI_SETMOUSE (4), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE (3) : appliqué tout de suite
+    [void][OptiFortnite.Natif]::SystemParametersInfo(4, 0, $valeurs, 3)
+}
+
+function Set-Souris {
+    $cle = 'HKCU:\Control Panel\Mouse'
+    Set-ValeurRegistre -Path $cle -Name 'MouseSpeed' -Value '0' -Type 'String'
+    Set-ValeurRegistre -Path $cle -Name 'MouseThreshold1' -Value '0' -Type 'String'
+    Set-ValeurRegistre -Path $cle -Name 'MouseThreshold2' -Value '0' -Type 'String'
+    Update-Souris
+    Write-Ok '« Améliorer la précision du pointeur » désactivé : la souris bouge en 1:1 partout.'
+}
+
+function Set-TouchesRemanentes {
+    $base = 'HKCU:\Control Panel\Accessibility'
+    Set-ValeurRegistre -Path "$base\StickyKeys" -Name 'Flags' -Value '506' -Type 'String'
+    Set-ValeurRegistre -Path "$base\ToggleKeys" -Name 'Flags' -Value '58' -Type 'String'
+    Set-ValeurRegistre -Path "$base\Keyboard Response" -Name 'Flags' -Value '122' -Type 'String'
+    Write-Ok 'Plus de fenêtre « touches rémanentes » quand tu spammes Maj (effet au redémarrage).'
+}
+
+function Set-Hags {
+    Set-ValeurRegistre -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers' -Name 'HwSchMode' -Value 2
+    Write-Ok 'Planification GPU accélérée par le matériel activée (si ta carte la gère, effet au redémarrage).'
+}
+
+function Set-JeuxFenetres {
+    $cle = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
+    $actuel = ''
+    if (Test-Path -LiteralPath $cle) {
+        $actuel = [string](Get-ItemProperty -LiteralPath $cle -Name 'DirectXUserGlobalSettings' -ErrorAction SilentlyContinue).DirectXUserGlobalSettings
+    }
+    if ($actuel -notmatch 'SwapEffectUpgradeEnable=1') {
+        $nouveau = $actuel -replace 'SwapEffectUpgradeEnable=\d;?', ''
+        if ($nouveau -and -not $nouveau.EndsWith(';')) { $nouveau += ';' }
+        $nouveau += 'SwapEffectUpgradeEnable=1;'
+        Set-ValeurRegistre -Path $cle -Name 'DirectXUserGlobalSettings' -Value $nouveau -Type 'String'
+    }
+    Write-Ok 'Optimisations pour les jeux fenêtrés activées (Windows 11).'
+}
+
+function Set-PrioriteJeux {
+    $profil = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'
+    Set-ValeurRegistre -Path $profil -Name 'SystemResponsiveness' -Value 10   # minimum réservé aux tâches de fond
+    $jeux = "$profil\Tasks\Games"
+    Set-ValeurRegistre -Path $jeux -Name 'GPU Priority' -Value 8
+    Set-ValeurRegistre -Path $jeux -Name 'Priority' -Value 6
+    Set-ValeurRegistre -Path $jeux -Name 'Scheduling Category' -Value 'High' -Type 'String'
+    Set-ValeurRegistre -Path $jeux -Name 'SFIO Priority' -Value 'High' -Type 'String'
+    Write-Ok 'Planificateur multimédia : priorité maximale aux jeux.'
+}
+
+# ---------------------------------------------------------------------------
+# FPS
+# ---------------------------------------------------------------------------
 function Set-ModeJeu {
     Set-ValeurRegistre -Path 'HKCU:\Software\Microsoft\GameBar' -Name 'AutoGameModeEnabled' -Value 1
     Set-ValeurRegistre -Path 'HKCU:\Software\Microsoft\GameBar' -Name 'AllowAutoGameMode' -Value 1
-    Write-Ok "Mode Jeu activé (Windows Update ne s'installe pas en pleine partie, priorité au jeu)."
-
+    Write-Ok 'Mode Jeu activé (Windows Update ne s''installe pas en pleine partie, priorité au jeu).'
     Set-ValeurRegistre -Path 'HKCU:\System\GameConfigStore' -Name 'GameDVR_Enabled' -Value 0
     Set-ValeurRegistre -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR' -Name 'AppCaptureEnabled' -Value 0
-    Write-Ok "Enregistrement vidéo en arrière-plan de la Xbox Game Bar coupé (il mange des FPS)."
-    Write-Info "(ShadowPlay / NVIDIA App et Medal ne sont pas concernés.)"
+    Write-Ok 'Enregistrement vidéo en arrière-plan de la Game Bar coupé (il mange des FPS).'
+    Write-Info '(ShadowPlay / NVIDIA App et Medal ne sont pas concernés.)'
 }
 
 function Get-FortniteExe {
@@ -265,147 +517,324 @@ function Get-FortniteExe {
     }
     $dossiers.Add((Join-Path $env:ProgramFiles 'Epic Games\Fortnite'))
     foreach ($dossier in $dossiers) {
-        $exe = Join-Path $dossier 'FortniteGame\Binaries\Win64\FortniteClient-Win64-Shipping.exe'
+        $exe = Join-Path $dossier "FortniteGame\Binaries\Win64\$($script:ExeFortnite)"
         if (Test-Path -LiteralPath $exe) { return [System.IO.Path]::GetFullPath($exe) }
     }
     return $null
 }
 
-function Set-OptionsGraphiques {
-    $cle = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
-
+function Set-GpuFortnite {
     $exe = Get-FortniteExe
-    if ($exe) {
-        Set-ValeurRegistre -Path $cle -Name $exe -Value 'GpuPreference=2;' -Type 'String'
-        Write-Ok "Fortnite forcé sur la carte graphique la plus puissante."
-        Write-Info $exe
-    } else {
-        Write-Attention "Fortnite introuvable (installé ailleurs ?) : réglage GPU ignoré."
-    }
-
-    # « Optimisations pour les jeux fenêtrés » (Windows 11) : moins de latence
-    # en mode fenêtré / plein écran fenêtré.
-    $actuel = ''
-    if (Test-Path -LiteralPath $cle) {
-        $actuel = [string](Get-ItemProperty -LiteralPath $cle -Name 'DirectXUserGlobalSettings' -ErrorAction SilentlyContinue).DirectXUserGlobalSettings
-    }
-    if ($actuel -notmatch 'SwapEffectUpgradeEnable=1') {
-        $nouveau = $actuel -replace 'SwapEffectUpgradeEnable=\d;?', ''
-        if ($nouveau -and -not $nouveau.EndsWith(';')) { $nouveau += ';' }
-        $nouveau += 'SwapEffectUpgradeEnable=1;'
-        Set-ValeurRegistre -Path $cle -Name 'DirectXUserGlobalSettings' -Value $nouveau -Type 'String'
-    }
-    Write-Ok "Optimisations pour les jeux fenêtrés activées (Windows 11)."
+    if (-not $exe) { Write-Attention 'Fortnite introuvable (installé ailleurs ?) : réglage ignoré.'; return }
+    Set-ValeurRegistre -Path 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences' -Name $exe -Value 'GpuPreference=2;' -Type 'String'
+    Write-Ok 'Fortnite forcé sur la carte graphique la plus puissante.'
+    Write-Info $exe
 }
 
-function Update-Souris {
-    Initialize-Natif
-    $p = Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Mouse'
-    $valeurs = [int[]]@([int]$p.MouseThreshold1, [int]$p.MouseThreshold2, [int]$p.MouseSpeed)
-    # SPI_SETMOUSE (4), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE (3) : appliqué tout de suite
-    [void][OptiFortnite.Natif]::SystemParametersInfo(4, 0, $valeurs, 3)
+function Get-HvciActive {
+    if (-not (Test-Path -LiteralPath $script:CleHvci)) { return $false }
+    $valeur = (Get-ItemProperty -LiteralPath $script:CleHvci -Name 'Enabled' -ErrorAction SilentlyContinue).Enabled
+    return ($valeur -eq 1)
 }
 
-function Set-Souris {
-    $cle = 'HKCU:\Control Panel\Mouse'
-    Set-ValeurRegistre -Path $cle -Name 'MouseSpeed' -Value '0' -Type 'String'
-    Set-ValeurRegistre -Path $cle -Name 'MouseThreshold1' -Value '0' -Type 'String'
-    Set-ValeurRegistre -Path $cle -Name 'MouseThreshold2' -Value '0' -Type 'String'
-    Update-Souris
-    Write-Ok "« Améliorer la précision du pointeur » désactivé : la souris bouge en 1:1 partout."
-    Write-Info "(En partie, Fortnite lit déjà la souris en direct ; ça rend surtout menus et éditions cohérents.)"
-}
-
-function Set-PrioriteJeux {
-    $profil = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'
-    Set-ValeurRegistre -Path $profil -Name 'NetworkThrottlingIndex' -Value -1   # 0xFFFFFFFF = pas de bridage réseau
-    Set-ValeurRegistre -Path $profil -Name 'SystemResponsiveness' -Value 10     # 10 % réservés aux tâches de fond (minimum)
-
-    $jeux = "$profil\Tasks\Games"
-    Set-ValeurRegistre -Path $jeux -Name 'GPU Priority' -Value 8
-    Set-ValeurRegistre -Path $jeux -Name 'Priority' -Value 6
-    Set-ValeurRegistre -Path $jeux -Name 'Scheduling Category' -Value 'High' -Type 'String'
-    Set-ValeurRegistre -Path $jeux -Name 'SFIO Priority' -Value 'High' -Type 'String'
-    Write-Ok "Planificateur multimédia : priorité aux jeux, pas de bridage réseau (gain léger, sans risque)."
-}
-
-function Set-CarteReseau {
-    $cartes = @(Get-NetAdapter -Physical -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' })
-    if ($cartes.Count -eq 0) { Write-Info "Aucune carte réseau active trouvée."; return }
-
-    # Fonctions d'économie d'énergie qui ajoutent des micro-coupures / du délai.
-    # Mots-clés standard des pilotes (indépendants de la langue de Windows).
-    $motsCles = @('*EEE', 'EEELinkAdvertisement', 'AdvancedEEE', 'EnableGreenEthernet',
-                  'GreenEthernet', 'PowerSavingMode', 'ULPMode')
-
-    foreach ($carte in $cartes) {
-        $modifiee = $false
-        $proprietes = @(Get-NetAdapterAdvancedProperty -Name $carte.Name -ErrorAction SilentlyContinue)
-        foreach ($motCle in $motsCles) {
-            $p = $proprietes | Where-Object { $_.RegistryKeyword -eq $motCle } | Select-Object -First 1
-            if (-not $p) { continue }
-            $valeurActuelle = [string](@($p.RegistryValue)[0])
-            if ($valeurActuelle -eq '0') { continue }
-            if ($p.ValidRegistryValues -and (@($p.ValidRegistryValues) -notcontains '0')) { continue }
-            try {
-                Add-Entree -Id "NIC|$($carte.Name)|$motCle" -Kind 'Nic' -Path $carte.Name -Name $motCle -Value $valeurActuelle
-                Set-NetAdapterAdvancedProperty -Name $carte.Name -RegistryKeyword $motCle -RegistryValue '0' -NoRestart -Confirm:$false
-                $modifiee = $true
-                Write-Ok "$($carte.Name) : « $($p.DisplayName) » désactivé."
-            } catch {
-                Write-Attention "$($carte.Name) : « $($p.DisplayName) » non modifiable ($($_.Exception.Message))."
-            }
-        }
-        if ($modifiee) {
-            Write-Info "Redémarrage de « $($carte.Name) » (coupure de quelques secondes)..."
-            Restart-NetAdapter -Name $carte.Name -Confirm:$false
-        } else {
-            Write-Ok "$($carte.Name) : rien à changer."
-        }
-    }
-}
-
-# ---------------------------------------------------------------------------
-# Actions du menu
-# ---------------------------------------------------------------------------
-function Invoke-Optimisation {
-    Write-Titre 'Ce qui va être fait'
-    Write-Info '1. Point de restauration Windows (filet de sécurité)'
-    Write-Info '2. Plan d''alimentation hautes performances'
-    Write-Info '3. Mode Jeu activé + enregistrement Game Bar en arrière-plan coupé'
-    Write-Info '4. Fortnite sur la carte graphique dédiée + jeux fenêtrés optimisés'
-    Write-Info '5. Accélération de la souris Windows désactivée'
-    Write-Info '6. Priorité aux jeux dans le planificateur multimédia'
-    Write-Info '7. Économies d''énergie de la carte réseau désactivées'
+function Request-ChoixHvci {
+    if ($null -ne $script:ChoixHVCI) { return }
+    if (-not (Get-HvciActive)) { $script:ChoixHVCI = $false; return }
     Write-Host ''
-    Write-Attention 'Ferme Fortnite et le launcher Epic avant de continuer.'
-    Write-Attention 'Internet peut couper quelques secondes pendant l''étape 7.'
-    if (-not (Read-Oui 'Continuer ?')) { Write-Info 'Annulé, rien n''a été modifié.'; return }
+    Write-Attention 'OPTION : l''« intégrité de la mémoire » (Sécurité Windows) est activée sur ce PC.'
+    Write-Info 'La couper donne souvent +5 à 10 % de FPS, MAIS Windows est moins protégé contre'
+    Write-Info 'les virus qui s''attaquent au cœur du système. Tu peux la réactiver quand tu veux.'
+    $script:ChoixHVCI = Read-Oui 'Désactiver l''intégrité de la mémoire ?'
+}
 
-    Read-Sauvegarde
+function Set-IntegriteMemoire {
+    if (-not (Get-HvciActive)) { Write-Ok 'Intégrité de la mémoire déjà désactivée : rien à faire.'; return }
+    Request-ChoixHvci
+    if (-not $script:ChoixHVCI) { Write-Info 'Conservée (tu as choisi la sécurité maximale).'; return }
+    Set-ValeurRegistre -Path $script:CleHvci -Name 'Enabled' -Value 0
+    Write-Ok 'Intégrité de la mémoire désactivée (effet au redémarrage).'
+    Write-Info 'Pour la remettre : Sécurité Windows > Sécurité de l''appareil > Isolation du noyau, ou option « Restaurer ».'
+}
 
-    Invoke-Etape 'Point de restauration Windows (peut prendre 1 minute)' {
-        Checkpoint-Computer -Description 'Avant optimisation Fortnite' -RestorePointType 'MODIFY_SETTINGS'
-        Write-Ok 'Point de restauration prêt (Windows n''en crée qu''un par 24 h).'
+# ---------------------------------------------------------------------------
+# FORTNITE (fichier de réglages du jeu, comme le menu Paramètres)
+# ---------------------------------------------------------------------------
+function Request-ChoixGraphismes {
+    if ($null -ne $script:ChoixGraphismes) { return }
+    Write-Host ''
+    Write-Attention 'OPTION : graphismes « compétitifs » dans Fortnite.'
+    Write-Info 'Ombres, effets, reflets, post-traitement, illumination et herbe au minimum :'
+    Write-Info 'beaucoup plus de FPS et une meilleure visibilité, mais une image moins jolie.'
+    Write-Info '(Textures et distance d''affichage ne sont pas touchées.)'
+    $script:ChoixGraphismes = Read-Oui 'Passer les graphismes en mode compétitif ?'
+}
+
+# Remplace la valeur d'une clé déjà présente dans le fichier (n'ajoute rien).
+function Set-CleIni([string]$Texte, [string]$Cle, [string]$Valeur) {
+    $motif = '(?m)^([ \t]*' + [regex]::Escape($Cle) + '[ \t]*=)[^\r\n]*'
+    if ($Texte -notmatch $motif) { return $Texte }
+    return [regex]::Replace($Texte, $motif, ('${1}' + $Valeur))
+}
+
+function Get-FichierReglagesFortnite {
+    return (Join-Path $env:LOCALAPPDATA 'FortniteGame\Saved\Config\WindowsClient\GameUserSettings.ini')
+}
+
+function Set-ConfigFortnite {
+    if (Test-FortniteOuvert) { throw 'Fortnite est ouvert : ferme-le puis relance cette option.' }
+    $ini = Get-FichierReglagesFortnite
+    if (-not (Test-Path -LiteralPath $ini)) {
+        Write-Attention 'Fichier de réglages de Fortnite introuvable : lance le jeu une fois, ferme-le, puis relance cette option.'
+        return
     }
-    Invoke-Etape 'Plan d''alimentation'                                     { Set-PlanAlimentation }
-    Invoke-Etape 'Mode Jeu + Game Bar'                                      { Set-ModeJeu }
-    Invoke-Etape 'Carte graphique'                                          { Set-OptionsGraphiques }
-    Invoke-Etape 'Souris'                                                   { Set-Souris }
-    Invoke-Etape 'Priorité aux jeux'                                        { Set-PrioriteJeux }
-    Invoke-Etape 'Carte réseau'                                             { Set-CarteReseau }
+    Request-ChoixGraphismes
 
+    # Copie du fichier d'origine (une seule fois).
+    $id = "FILE|$ini"
+    if (-not $script:DejaSauve.ContainsKey($id)) {
+        if (-not (Test-Path -LiteralPath $script:DossierSauvegarde)) {
+            New-Item -ItemType Directory -Path $script:DossierSauvegarde -Force | Out-Null
+        }
+        $copie = Join-Path $script:DossierSauvegarde 'GameUserSettings.ini.original'
+        Copy-Item -LiteralPath $ini -Destination $copie -Force
+        Add-Entree -Id $id -Kind 'File' -Path $ini -Value $copie
+    }
+
+    # On réécrit le fichier dans son encodage d'origine.
+    $octets = [System.IO.File]::ReadAllBytes($ini)
+    $encodage = New-Object System.Text.UTF8Encoding($false)
+    if ($octets.Length -ge 2 -and $octets[0] -eq 0xFF -and $octets[1] -eq 0xFE) {
+        $encodage = New-Object System.Text.UnicodeEncoding($false, $true)
+    } elseif ($octets.Length -ge 3 -and $octets[0] -eq 0xEF -and $octets[1] -eq 0xBB -and $octets[2] -eq 0xBF) {
+        $encodage = New-Object System.Text.UTF8Encoding($true)
+    }
+    $texte = [System.IO.File]::ReadAllText($ini)
+    $original = $texte
+
+    $reglages = [ordered]@{
+        'FullscreenMode'              = '0'
+        'LastConfirmedFullscreenMode' = '0'
+        'PreferredFullscreenMode'     = '0'
+        'bUseVSync'                   = 'False'
+        'bMotionBlur'                 = 'False'
+        'bShowFPS'                    = 'True'
+        'bDisableMouseAcceleration'   = 'True'
+    }
+    if (Test-CarteNvidia) { $reglages['LatencyTweak2'] = '2' }
+    if ($script:ChoixGraphismes) {
+        foreach ($cle in @('sg.ShadowQuality', 'sg.GlobalIlluminationQuality', 'sg.ReflectionQuality',
+                           'sg.PostProcessQuality', 'sg.EffectsQuality', 'sg.FoliageQuality')) {
+            $reglages[$cle] = '0'
+        }
+    }
+
+    $libelles = @{
+        'FullscreenMode'               = 'Mode plein écran'
+        'bUseVSync'                    = 'V-Sync désactivée'
+        'bMotionBlur'                  = 'Flou de mouvement désactivé'
+        'bShowFPS'                     = 'Compteur de FPS affiché'
+        'bDisableMouseAcceleration'    = 'Accélération souris du jeu désactivée'
+        'LatencyTweak2'                = 'NVIDIA Reflex : Activé + Boost'
+        'sg.ShadowQuality'             = 'Ombres désactivées'
+        'sg.GlobalIlluminationQuality' = 'Illumination globale au minimum'
+        'sg.ReflectionQuality'         = 'Reflets au minimum'
+        'sg.PostProcessQuality'        = 'Post-traitement au minimum'
+        'sg.EffectsQuality'            = 'Effets au minimum'
+        'sg.FoliageQuality'            = 'Herbe / végétation au minimum'
+    }
+
+    $modifs = New-Object System.Collections.Generic.List[string]
+    foreach ($cle in $reglages.Keys) {
+        $avant = $texte
+        $texte = Set-CleIni -Texte $texte -Cle $cle -Valeur $reglages[$cle]
+        if ($texte -cne $avant -and $libelles.ContainsKey($cle)) { $modifs.Add($libelles[$cle]) }
+    }
+
+    # Limite de FPS : jamais en dessous de la fréquence de l'écran.
+    $hz = Get-FrequenceEcran
+    if ($hz -gt 60 -and $texte -match '(?m)^[ \t]*FrameRateLimit[ \t]*=[ \t]*([0-9.]+)') {
+        $limite = [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture)
+        if ($limite -gt 0 -and $limite -lt $hz) {
+            $texte = Set-CleIni -Texte $texte -Cle 'FrameRateLimit' -Valeur ('{0}.000000' -f $hz)
+            $modifs.Add("Limite de FPS remontée de $([int]$limite) à $hz (fréquence de ton écran)")
+        }
+    }
+
+    if ($texte -cne $original) {
+        [System.IO.File]::WriteAllText($ini, $texte, $encodage)
+        foreach ($m in $modifs) { Write-Ok $m }
+    } else {
+        Write-Ok 'Les réglages de Fortnite étaient déjà optimisés.'
+    }
+}
+
+function Show-ReglagesManuelsFortnite {
+    Write-Info 'À vérifier une fois dans le jeu (Paramètres > Vidéo) :'
+    Write-Info ' - Mode de rendu : « Performance » (le plus réactif)'
+    Write-Info ' - NVIDIA Reflex : « Activé + Boost »  |  carte AMD : « Anti-Lag 2 » activé'
+    Write-Info ' - Paramètres > Jeu : région de matchmaking avec le ping le plus bas'
+    Write-Info ' - Active les « statistiques réseau » (Net Debug Stats) pour voir ton vrai ping'
+}
+
+# ---------------------------------------------------------------------------
+# PC COMPLET
+# ---------------------------------------------------------------------------
+function Set-AppsArrierePlan {
+    Set-ValeurRegistre -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications' -Name 'GlobalUserDisabled' -Value 1
+    Write-Ok 'Applications du Microsoft Store bloquées en arrière-plan.'
+    Write-Info '(Les logiciels classiques comme Discord ou Steam ne sont pas concernés.)'
+}
+
+function Set-EffetsVisuels {
+    Set-ValeurRegistre -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name 'EnableTransparency' -Value 0
+    Set-ValeurRegistre -Path 'HKCU:\Control Panel\Desktop\WindowMetrics' -Name 'MinAnimate' -Value '0' -Type 'String'
+    Write-Ok 'Transparence et animations des fenêtres coupées (Windows plus vif).'
+}
+
+function Set-DemarrageRapide {
+    Set-ValeurRegistre -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name 'HiberbootEnabled' -Value 0
+    Write-Ok 'Démarrage rapide coupé : pilotes et mémoire repartent propres à chaque allumage.'
+}
+
+function Set-Telemetrie {
+    $cle = 'HKLM:\SYSTEM\CurrentControlSet\Services\DiagTrack'
+    if (-not (Test-Path -LiteralPath $cle)) { Write-Info 'Service de télémétrie absent.'; return }
+    Set-ValeurRegistre -Path $cle -Name 'Start' -Value 4
+    Stop-Service -Name 'DiagTrack' -Force -ErrorAction SilentlyContinue
+    Write-Ok 'Télémétrie Microsoft (DiagTrack) arrêtée : une tâche de fond en moins.'
+}
+
+function Clear-FichiersTemp {
+    $limite = (Get-Date).AddDays(-1)
+    $total = [long]0; $nombre = 0
+    foreach ($dossier in @($env:TEMP, (Join-Path $env:SystemRoot 'Temp'))) {
+        if (-not $dossier -or -not (Test-Path -LiteralPath $dossier)) { continue }
+        $fichiers = @(Get-ChildItem -LiteralPath $dossier -Recurse -Force -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -lt $limite })
+        foreach ($f in $fichiers) {
+            try {
+                $taille = $f.Length
+                Remove-Item -LiteralPath $f.FullName -Force
+                $total += $taille; $nombre++
+            } catch { }
+        }
+    }
+    Write-Ok ('{0} fichiers temporaires supprimés ({1:N0} Mo libérés).' -f $nombre, ($total / 1MB))
+    Write-Info 'Les caches de shaders sont gardés exprès : les vider provoquerait des saccades.'
+}
+
+function Show-ProgrammesDemarrage {
+    $liste = @(Get-CimInstance -ClassName Win32_StartupCommand -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty Name -Unique)
+    if ($liste.Count -eq 0) { Write-Ok 'Aucun programme au démarrage détecté.'; return }
+    Write-Info "$($liste.Count) programme(s) se lancent avec Windows :"
+    foreach ($nom in $liste) { Write-Info " - $nom" }
+    Write-Attention 'Désactive ceux qui ne servent pas : Ctrl+Maj+Échap > Applications de démarrage.'
+    Write-Info '(Garde l''antivirus, les pilotes audio/graphiques et le logiciel de ta souris.)'
+}
+
+# ---------------------------------------------------------------------------
+# Sections
+# ---------------------------------------------------------------------------
+function Invoke-SectionConnexion {
+    Write-Section 'CONNEXION : réduire le ping et les pics de lag'
+    Invoke-Etape 'Carte réseau' { Set-CarteReseau }
+    Invoke-Etape 'Priorité réseau pour Fortnite (QoS)' { Set-QosFortnite }
+    Invoke-Etape 'Bridage réseau de Windows' { Set-BridageReseau }
+    Invoke-Etape 'Partage des mises à jour Windows' { Set-PartageMisesAJour }
+}
+
+function Invoke-SectionLatence {
+    Write-Section 'LATENCE : supprimer le délai (input lag)'
+    Invoke-Etape 'Souris' { Set-Souris }
+    Invoke-Etape 'Touches rémanentes' { Set-TouchesRemanentes }
+    Invoke-Etape 'Planification GPU' { Set-Hags }
+    Invoke-Etape 'Jeux fenêtrés' { Set-JeuxFenetres }
+    Invoke-Etape 'Priorité aux jeux' { Set-PrioriteJeux }
+    Invoke-Etape 'Mise en veille PCI Express / USB' { Set-EnergieLatence }
+}
+
+function Invoke-SectionFps {
+    Write-Section 'FPS : plus d''images par seconde, plus stables'
+    Invoke-Etape 'Plan d''alimentation' { Set-PlanAlimentation }
+    Invoke-Etape 'Mode Jeu + Game Bar' { Set-ModeJeu }
+    Invoke-Etape 'Carte graphique dédiée pour Fortnite' { Set-GpuFortnite }
+    Invoke-Etape 'Intégrité de la mémoire' { Set-IntegriteMemoire }
+}
+
+function Invoke-SectionFortnite {
+    Write-Section 'FORTNITE : réglages du jeu'
+    Invoke-Etape 'Fichier de réglages de Fortnite' { Set-ConfigFortnite }
+    Show-ReglagesManuelsFortnite
+}
+
+function Invoke-SectionPc {
+    Write-Section 'PC COMPLET : Windows plus léger'
+    Invoke-Etape 'Applications en arrière-plan' { Set-AppsArrierePlan }
+    Invoke-Etape 'Effets visuels' { Set-EffetsVisuels }
+    Invoke-Etape 'Démarrage rapide' { Set-DemarrageRapide }
+    Invoke-Etape 'Télémétrie' { Set-Telemetrie }
+    Invoke-Etape 'Nettoyage des fichiers temporaires' { Clear-FichiersTemp }
+    Invoke-Etape 'Programmes au démarrage' { Show-ProgrammesDemarrage }
+}
+
+function Show-Fin {
     Write-Host ''
     Write-Host '  ==================== TERMINÉ ====================' -ForegroundColor Green
-    Write-Info "Réglages d'origine sauvegardés dans : $script:FichierSauvegarde"
-    Write-Info 'Pour tout annuler : relance LANCER.bat et choisis « 2. Restaurer ».'
+    Write-Info "Réglages d'origine sauvegardés dans : $script:DossierSauvegarde"
+    Write-Info 'Pour tout annuler : relance LANCER.bat et choisis « 8. Restaurer ».'
     Write-Host ''
-    Write-Attention 'Le plus gros gain reste dans les réglages de Fortnite et de ta carte graphique :'
-    Write-Attention 'suis le guide README.md (Plein écran, Mode Performance, NVIDIA Reflex, câble Ethernet...).'
+    Write-Attention 'Ce qu''AUCUN logiciel ne peut faire à ta place (et c''est là que se joue le ping) :'
+    Write-Info ' - un câble Ethernet entre le PC et la box (le Wi-Fi = pics de ping)'
+    Write-Info ' - personne qui télécharge ou regarde un stream pendant tes parties'
+    Write-Info ' - la bonne région de matchmaking dans Fortnite'
+    Write-Info 'Détails dans le guide README.md.'
     Write-Host ''
-    if (Read-Oui 'Redémarrer le PC maintenant (conseillé) ?') { Restart-Computer -Force }
+    if (Read-Oui 'Redémarrer le PC maintenant (nécessaire pour tout activer) ?') { Restart-Computer -Force }
 }
 
+function Invoke-Application([string]$Titre, [string[]]$Details, [scriptblock]$Sections, [bool]$CoupeReseau) {
+    Write-Titre $Titre
+    foreach ($ligne in $Details) { Write-Info "- $ligne" }
+    Write-Host ''
+    if (Test-FortniteOuvert) { Write-Attention 'Fortnite est ouvert : ferme-le avant de continuer.' }
+    if ($CoupeReseau) { Write-Attention 'Internet va couper quelques secondes (redémarrage de la carte réseau).' }
+    if (-not (Read-Oui 'Continuer ?')) { Write-Info 'Annulé, rien n''a été modifié.'; return }
+    Read-Sauvegarde
+    New-PointRestauration
+    & $Sections
+    Show-Fin
+}
+
+function Invoke-Tout {
+    Write-Titre 'TOUT OPTIMISER : voici tout ce qui va être fait'
+    Write-Host '   Connexion' -ForegroundColor White;  foreach ($l in $script:DetailsConnexion) { Write-Info "- $l" }
+    Write-Host '   Latence' -ForegroundColor White;    foreach ($l in $script:DetailsLatence)   { Write-Info "- $l" }
+    Write-Host '   FPS' -ForegroundColor White;        foreach ($l in $script:DetailsFps)       { Write-Info "- $l" }
+    Write-Host '   Fortnite' -ForegroundColor White;   foreach ($l in $script:DetailsFortnite)  { Write-Info "- $l" }
+    Write-Host '   PC complet' -ForegroundColor White; foreach ($l in $script:DetailsPc)        { Write-Info "- $l" }
+    Write-Host ''
+    if (Test-FortniteOuvert) { Write-Attention 'Fortnite est ouvert : ferme-le avant de continuer.' }
+    Write-Attention 'Internet va couper quelques secondes (redémarrage de la carte réseau).'
+    if (-not (Read-Oui 'Lancer l''optimisation complète ?')) { Write-Info 'Annulé, rien n''a été modifié.'; return }
+
+    # Les 2 seules questions, posées avant de commencer.
+    Request-ChoixHvci
+    if (Test-Path -LiteralPath (Get-FichierReglagesFortnite)) { Request-ChoixGraphismes }
+
+    Read-Sauvegarde
+    New-PointRestauration
+    Invoke-SectionFps        # en premier : le plan d'alimentation
+    Invoke-SectionLatence
+    Invoke-SectionConnexion
+    Invoke-SectionFortnite
+    Invoke-SectionPc
+    Show-Fin
+}
+
+# ---------------------------------------------------------------------------
+# Restauration
+# ---------------------------------------------------------------------------
 function Invoke-Restauration {
     Read-Sauvegarde
     if ($script:Sauvegarde.Count -eq 0) { Write-Attention 'Aucune sauvegarde trouvée : rien à restaurer.'; return }
@@ -415,15 +844,24 @@ function Invoke-Restauration {
     [array]::Reverse($entrees)
     $erreurs = 0
 
-    Write-Titre 'Plan d''alimentation'
+    Write-Titre 'Alimentation'
+    foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'PowerSetting' })) {
+        if (-not (Test-PlanExiste $e.Path)) { continue }
+        $parties = ([string]$e.Name).Split('|')
+        $r = Invoke-Natif 'powercfg.exe' @('/setacvalueindex', [string]$e.Path, $parties[0], $parties[1], [string]$e.Value)
+        if ($r.Code -ne 0) { $erreurs++; Write-Attention $r.Texte }
+    }
     foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'PowerScheme' })) {
         $r = Invoke-Natif 'powercfg.exe' @('/setactive', [string]$e.Value)
-        if ($r.Code -eq 0) { Write-Ok "Plan d'origine réactivé." } else { $erreurs++; Write-Attention $r.Texte }
+        if ($r.Code -eq 0) { Write-Ok 'Plan d''origine réactivé.' } else { $erreurs++; Write-Attention $r.Texte }
     }
+    $actif = Get-PlanActif
+    if ($actif) { [void](Invoke-Natif 'powercfg.exe' @('/setactive', $actif)) }
     foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'PowerCreated' })) {
         $r = Invoke-Natif 'powercfg.exe' @('/delete', [string]$e.Value)
         if ($r.Code -eq 0) { Write-Ok 'Plan « Performances optimales » supprimé.' }
     }
+    Write-Ok 'Réglages d''alimentation remis.'
 
     Write-Titre 'Registre'
     foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'Reg' })) {
@@ -442,7 +880,11 @@ function Invoke-Restauration {
     try { Update-Souris } catch { }
     Write-Ok 'Valeurs du registre remises comme avant.'
 
-    Write-Titre 'Carte réseau'
+    Write-Titre 'Réseau'
+    foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'Qos' })) {
+        try { Remove-NetQosPolicy -Name ([string]$e.Name) -Confirm:$false -ErrorAction Stop; Write-Ok 'Priorité QoS de Fortnite retirée.' }
+        catch { $erreurs++; Write-Attention "QoS : $($_.Exception.Message)" }
+    }
     $cartes = @{}
     foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'Nic' })) {
         try {
@@ -456,21 +898,35 @@ function Invoke-Restauration {
     foreach ($nomCarte in @($cartes.Keys)) {
         try { Restart-NetAdapter -Name $nomCarte -Confirm:$false; Write-Ok "$nomCarte : réglages d'origine remis." } catch { $erreurs++ }
     }
-    if ($cartes.Count -eq 0) { Write-Ok 'Rien à remettre.' }
+
+    Write-Titre 'Fortnite'
+    foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'File' })) {
+        if (Test-FortniteOuvert) { $erreurs++; Write-Attention 'Fortnite est ouvert : ses réglages n''ont pas été remis.'; continue }
+        try {
+            Copy-Item -LiteralPath ([string]$e.Value) -Destination ([string]$e.Path) -Force
+            Write-Ok 'Fichier de réglages de Fortnite remis comme avant.'
+        } catch { $erreurs++; Write-Attention "Fortnite : $($_.Exception.Message)" }
+    }
 
     # On archive la sauvegarde pour repartir de zéro la prochaine fois.
-    $archive = Join-Path $script:DossierSauvegarde ("sauvegarde-restauree-{0:yyyyMMdd-HHmmss}.json" -f (Get-Date))
-    Move-Item -LiteralPath $script:FichierSauvegarde -Destination $archive -Force
+    if ($erreurs -eq 0) {
+        $archive = Join-Path $script:DossierSauvegarde ('sauvegarde-restauree-{0:yyyyMMdd-HHmmss}.json' -f (Get-Date))
+        Move-Item -LiteralPath $script:FichierSauvegarde -Destination $archive -Force
+    }
 
     Write-Host ''
     if ($erreurs -eq 0) {
         Write-Host '  ============ TOUT EST REVENU COMME AVANT ============' -ForegroundColor Green
     } else {
-        Write-Attention "$erreurs réglage(s) n'ont pas pu être remis. Le point de restauration Windows « Avant optimisation Fortnite » reste disponible."
+        Write-Attention "$erreurs réglage(s) n'ont pas pu être remis (la sauvegarde est gardée : tu peux relancer « Restaurer »)."
+        Write-Info 'Le point de restauration Windows « Avant optimisation Fortnite » reste aussi disponible.'
     }
     Write-Info 'Redémarre le PC pour finaliser.'
 }
 
+# ---------------------------------------------------------------------------
+# Diagnostic
+# ---------------------------------------------------------------------------
 function Measure-Ping([string]$Cible, [int]$Nombre = 40) {
     $ping = New-Object System.Net.NetworkInformation.Ping
     $temps = New-Object 'System.Collections.Generic.List[double]'
@@ -614,21 +1070,43 @@ function Invoke-Diagnostic {
     Write-Info 'Test de saturation de la box (bufferbloat) : https://www.waveform.com/tools/bufferbloat'
 }
 
+# ---------------------------------------------------------------------------
+# Menu
+# ---------------------------------------------------------------------------
+function Invoke-Choix([string]$Choix) {
+    switch ($Choix) {
+        'Tout'       { Invoke-Tout }
+        'Connexion'  { Invoke-Application 'CONNEXION : réduire le ping et les pics de lag' $script:DetailsConnexion { Invoke-SectionConnexion } $true }
+        'Latence'    { Invoke-Application 'LATENCE : supprimer le délai (input lag)' $script:DetailsLatence { Invoke-SectionLatence } $false }
+        'Fps'        { Invoke-Application 'FPS : plus d''images par seconde' $script:DetailsFps { Invoke-SectionFps } $false }
+        'Fortnite'   { Invoke-Application 'FORTNITE : réglages du jeu' $script:DetailsFortnite { Invoke-SectionFortnite } $false }
+        'Pc'         { Invoke-Application 'PC COMPLET : Windows plus léger' $script:DetailsPc { Invoke-SectionPc } $false }
+        'Diagnostic' { Invoke-Diagnostic }
+        'Restaurer'  { Invoke-Restauration }
+    }
+}
+
 function Show-Menu {
+    $correspondance = @{ '1' = 'Tout'; '2' = 'Connexion'; '3' = 'Latence'; '4' = 'Fps'; '5' = 'Fortnite'; '6' = 'Pc'; '7' = 'Diagnostic'; '8' = 'Restaurer' }
     while ($true) {
         Clear-Host
         Write-Banniere
-        Write-Host '   1. Appliquer les optimisations'
-        Write-Host '   2. Restaurer les réglages d''origine'
-        Write-Host '   3. Diagnostic (écran, Wi-Fi/câble, ping, gigue, pertes)'
-        Write-Host '   4. Quitter'
+        Write-Host '   1. TOUT OPTIMISER EN UN CLIC  (recommandé)' -ForegroundColor Green
         Write-Host ''
-        $choix = (Read-Host '  Ton choix').Trim()
-        if ($choix -eq '4') { return }
-        if ($choix -notin @('1', '2', '3')) { continue }
-        if ($choix -eq '1') { Invoke-Optimisation }
-        if ($choix -eq '2') { Invoke-Restauration }
-        if ($choix -eq '3') { Invoke-Diagnostic }
+        Write-Host '   2. Connexion  : réduire le ping et les pics de lag'
+        Write-Host '   3. Latence    : supprimer le délai (input lag)'
+        Write-Host '   4. FPS        : plus d''images par seconde, plus stables'
+        Write-Host '   5. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)'
+        Write-Host '   6. PC complet : Windows plus léger + nettoyage'
+        Write-Host ''
+        Write-Host '   7. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes'
+        Write-Host '   8. Restaurer  : tout remettre comme avant'
+        Write-Host '   0. Quitter'
+        Write-Host ''
+        $choix = "$(Read-Host '  Ton choix')".Trim()
+        if ($choix -eq '0') { return }
+        if (-not $correspondance.ContainsKey($choix)) { continue }
+        Invoke-Choix $correspondance[$choix]
         Write-Host ''
         Read-Host '  Appuie sur Entrée pour revenir au menu' | Out-Null
     }
@@ -654,11 +1132,11 @@ if (-not (Test-Admin)) {
     exit
 }
 
-try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite' } catch { }
+try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v2' } catch { }
 
-switch ($Action) {
-    'Appliquer'  { Invoke-Optimisation }
-    'Restaurer'  { Invoke-Restauration }
-    'Diagnostic' { Invoke-Diagnostic }
-    default      { Show-Menu }
+if ($Action -eq 'Menu') {
+    Show-Menu
+} else {
+    Invoke-Choix $Action
+    Read-Host '  Appuie sur Entrée pour fermer' | Out-Null
 }
