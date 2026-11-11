@@ -3,7 +3,7 @@
     Optimisation complète du PC pour Fortnite : ping, latence (input lag), FPS.
 
 .DESCRIPTION
-    Version 4. Menu par catégories + un bouton « TOUT OPTIMISER » + un
+    Version 5. Menu par catégories + un bouton « TOUT OPTIMISER » + un
     « MODE PARTIE » à lancer avant chaque session (ping au minimum).
 
     N'applique que des réglages documentés et 100 % réversibles : chaque valeur
@@ -128,7 +128,7 @@ function Write-Section([string]$Texte) {
 function Write-Banniere {
     Write-Host ''
     Write-Host '  ==================================================' -ForegroundColor Magenta
-    Write-Host '     OPTIMISATION FORTNITE v4  -  ping / latence / FPS' -ForegroundColor Magenta
+    Write-Host '     OPTIMISATION FORTNITE v5  -  ping / latence / FPS' -ForegroundColor Magenta
     Write-Host '  ==================================================' -ForegroundColor Magenta
     Write-Host ''
 }
@@ -1129,29 +1129,54 @@ function Invoke-Application([string]$Titre, [string[]]$Details, [scriptblock]$Se
     Show-Fin
 }
 
+# Si une version précédente de l'outil a modifié les réglages du jeu,
+# propose de les remettre comme avant (et l'outil n'y touche plus).
+function Restore-ConfigFortnite {
+    $entree = @($script:Sauvegarde | Where-Object { $_.Kind -eq 'File' }) | Select-Object -First 1
+    if (-not $entree) { return }
+    Write-Host ''
+    Write-Attention 'Une version précédente de l''outil avait modifié les réglages de ton jeu Fortnite.'
+    Write-Info '(Si tu as changé des réglages dans le jeu depuis, ils reviendront aussi comme avant.)'
+    if (-not (Read-Oui 'Remettre tes réglages Fortnite d''origine ?')) { Write-Info 'Réglages Fortnite laissés tels quels.'; return }
+    if (Test-FortniteOuvert) { Write-Attention 'Fortnite est ouvert : ferme-le puis relance les tweaks.'; return }
+    if (-not (Test-Path -LiteralPath ([string]$entree.Value))) { Write-Attention 'Copie d''origine introuvable : rien à remettre.'; return }
+    Copy-Item -LiteralPath ([string]$entree.Value) -Destination ([string]$entree.Path) -Force
+
+    $reste = @($script:Sauvegarde | Where-Object { $_.Id -ne $entree.Id })
+    $script:Sauvegarde = New-Object System.Collections.ArrayList
+    foreach ($x in $reste) { [void]$script:Sauvegarde.Add($x) }
+    [void]$script:DejaSauve.Remove($entree.Id)
+    if ($script:Sauvegarde.Count -eq 0) {
+        Remove-Item -LiteralPath $script:FichierSauvegarde -Force -ErrorAction SilentlyContinue
+    } else {
+        Write-Sauvegarde
+    }
+    Write-Ok 'Réglages Fortnite remis comme avant. Les tweaks n''y toucheront plus.'
+}
+
 function Invoke-Tout {
     Write-Titre 'TWEAKS 0 DÉLAI : voici tout ce qui va être fait'
     Write-Host '   Connexion' -ForegroundColor White;  foreach ($l in $script:DetailsConnexion) { Write-Info "- $l" }
     Write-Host '   Latence' -ForegroundColor White;    foreach ($l in $script:DetailsLatence)   { Write-Info "- $l" }
     Write-Host '   FPS' -ForegroundColor White;        foreach ($l in $script:DetailsFps)       { Write-Info "- $l" }
-    Write-Host '   Fortnite' -ForegroundColor White;   foreach ($l in $script:DetailsFortnite)  { Write-Info "- $l" }
     Write-Host '   PC complet' -ForegroundColor White; foreach ($l in $script:DetailsPc)        { Write-Info "- $l" }
+    Write-Host ''
+    Write-Ok 'Tes réglages DANS Fortnite (graphismes, touches, sensibilité...) ne sont PAS touchés.'
     Write-Host ''
     if (Test-FortniteOuvert) { Write-Attention 'Fortnite est ouvert : ferme-le avant de continuer.' }
     Write-Attention 'Internet va couper quelques secondes (redémarrage de la carte réseau).'
     if (-not (Read-Oui 'Lancer l''optimisation complète ?')) { Write-Info 'Annulé, rien n''a été modifié.'; return }
 
-    # Les 2 seules questions, posées avant de commencer.
-    Request-ChoixHvci
-    if (Test-Path -LiteralPath (Get-FichierReglagesFortnite)) { Request-ChoixGraphismes }
-
+    # Les questions, posées avant de commencer.
     Read-Sauvegarde
+    Request-ChoixHvci
+    Restore-ConfigFortnite
+
     New-PointRestauration
     Invoke-SectionFps        # en premier : le plan d'alimentation
     Invoke-SectionLatence
     Invoke-SectionConnexion
-    Invoke-SectionFortnite
-    Invoke-SectionPc
+    Invoke-SectionPc         # (les réglages du jeu ne sont pas touchés)
     Show-Fin
 }
 
@@ -1501,7 +1526,7 @@ function Show-Menu {
         Write-Host '   3. Connexion  : réduire le ping et les pics de lag'
         Write-Host '   4. Latence    : supprimer le délai (input lag)'
         Write-Host '   5. FPS        : plus d''images par seconde, plus stables'
-        Write-Host '   6. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)'
+        Write-Host '   6. Fortnite   : réglages DU JEU (optionnel, pas inclus dans les tweaks)'
         Write-Host '   7. PC complet : Windows plus léger + nettoyage'
         Write-Host ''
         Write-Host '   8. Diagnostic : BIOS, RAM, pilote, écran, Wi-Fi/câble, ping'
@@ -1537,7 +1562,7 @@ if (-not (Test-Admin)) {
     exit
 }
 
-try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v4' } catch { }
+try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v5' } catch { }
 
 # Mode partie mal fermé (fenêtre fermée, PC redémarré) : on remet le Wi-Fi normal.
 if ($Action -ne 'Partie' -and (Test-Path -LiteralPath $script:FichierPartie) -and -not (Test-PartieActive)) {

@@ -1,4 +1,4 @@
-# Optimisation Fortnite v4 : tweaks 0 délai (ping, latence, FPS, édition)
+# Optimisation Fortnite v5 : tweaks 0 délai pour ton PC (ping, latence, FPS)
 
 Un outil Windows **en un clic**, **sûr et 100 % réversible**, plus le guide des réglages
 qui comptent vraiment pour réduire le délai entre ton clic et l'action à l'écran.
@@ -34,15 +34,16 @@ sans pertes, et un input lag au plancher.
 3. (Conseillé) Double-clic sur **`LANCER.bat`** > **8. Diagnostic** pour voir ton point de
    départ (BIOS, RAM, pilote, écran, ping).
 4. **Double-clic sur `TWEAKS-0-DELAI.bat`** (une seule fois), puis réponds **Oui** à la fenêtre
-   administrateur. L'outil te pose **2 questions** (voir plus bas), puis fait tout seul.
+   administrateur. L'outil te pose **1 question** (voir plus bas), puis fait tout seul.
    Si ton écran change de fréquence, appuie sur **O** pour garder.
+   **Tes réglages dans Fortnite (graphismes, touches, sensibilité...) ne sont pas touchés.**
 5. **Redémarre le PC** (l'outil te le propose).
-6. Règle une fois les options de **construction / édition** dans Fortnite (section 4).
+6. (Conseillé, à toi de voir) les options de **construction / édition** dans Fortnite (section 4).
 7. **Avant chaque session de jeu : double-clic sur `MODE-PARTIE.bat`** (voir plus bas).
 
 | Fichier | Quand | Ce qu'il fait |
 |---|---|---|
-| `TWEAKS-0-DELAI.bat` | **Une fois** (et après une grosse mise à jour Windows) | Tous les tweaks d'un coup |
+| `TWEAKS-0-DELAI.bat` | **Une fois** (et après une grosse mise à jour Windows) | Tous les tweaks du PC d'un coup, **sans toucher aux réglages du jeu** |
 | `MODE-PARTIE.bat` | **Avant chaque session** | Ping au minimum pendant que tu joues |
 | `LANCER.bat` | Quand tu veux | Le menu complet (catégories, diagnostic, restaurer) |
 
@@ -53,7 +54,7 @@ sans pertes, et un input lag au plancher.
    3. Connexion  : réduire le ping et les pics de lag
    4. Latence    : supprimer le délai (input lag)
    5. FPS        : plus d'images par seconde, plus stables
-   6. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)
+   6. Fortnite   : réglages DU JEU (optionnel, pas inclus dans les tweaks)
    7. PC complet : Windows plus léger + nettoyage
 
    8. Diagnostic : BIOS, RAM, pilote, écran, Wi-Fi/câble, ping
@@ -65,14 +66,14 @@ sans pertes, et un input lag au plancher.
 `C:\Users\<toi>\FortniteOpti-Sauvegarde\` avant d'être modifiée, et un point de
 restauration Windows « Avant optimisation Fortnite » est créé en plus.
 
-### Les 2 questions qu'on te pose (ton choix)
+### La question qu'on te pose (ton choix)
 
 - **Intégrité de la mémoire** (seulement si elle est activée) : la couper donne souvent
   **+5 à 10 % de FPS**, mais Windows est moins protégé contre les virus qui visent le cœur
   du système. Réponds Oui si tu fais attention à ce que tu télécharges, sinon Non.
-- **Graphismes compétitifs** : ombres, effets, reflets, post-traitement, illumination et
-  herbe au minimum. **Beaucoup plus de FPS et une meilleure visibilité**, mais une image
-  moins jolie. Les textures et la distance d'affichage ne sont pas touchées.
+
+**Si tu as lancé la v4 avant :** elle avait modifié les réglages de ton jeu. Les tweaks te
+proposent de les **remettre comme avant** ; ensuite, ils n'y touchent plus jamais.
 
 ---
 
@@ -133,12 +134,14 @@ appuie sur Entrée dans la fenêtre.
 | *Exception Ryzen X3D :* plan « Utilisation normale » gardé | Le pilote AMD en a besoin pour mettre le jeu sur les cœurs avec le cache 3D | Évite une perte de FPS |
 | Mode Jeu + enregistrement Game Bar en arrière-plan coupé | L'enregistrement permanent coûte des FPS | Moyen |
 | Fortnite forcé sur la carte graphique dédiée | Indispensable sur PC portable | Énorme sur portable |
-| Intégrité de la mémoire (option) | Voir les 2 questions plus haut | +5 à 10 % |
+| Intégrité de la mémoire (option) | Voir la question plus haut | +5 à 10 % |
 
-### Fortnite (fichier de réglages du jeu)
+### Fortnite : réglages du jeu (OPTIONNEL, choix 6 du menu uniquement)
 
-L'outil modifie **uniquement le fichier de réglages** (`GameUserSettings.ini`), exactement
-comme le menu Paramètres du jeu. Aucun fichier du jeu, aucun risque avec l'anti-cheat.
+**Pas inclus dans `TWEAKS-0-DELAI.bat`.** Seulement si tu choisis **6** dans `LANCER.bat`,
+l'outil modifie le fichier de réglages du jeu (`GameUserSettings.ini`), comme le menu
+Paramètres de Fortnite. Il te demande aussi si tu veux les **graphismes compétitifs**
+(ombres, effets, reflets au minimum : plus de FPS, image moins jolie).
 
 - Plein écran, V-Sync coupée, flou de mouvement coupé, compteur de FPS affiché
 - NVIDIA Reflex « Activé + Boost » (cartes NVIDIA)
@@ -311,7 +314,7 @@ faire ; dans l'ordre :
 
 ## Checklist rapide
 
-- [ ] **`TWEAKS-0-DELAI.bat`** + PC redémarré
+- [ ] **`TWEAKS-0-DELAI.bat`** + PC redémarré (tes réglages du jeu restent intacts)
 - [ ] Construction : **Éditer au relâchement**, Construction turbo, Changement de matériau auto
 - [ ] Diagnostic : RAM pas bridée (XMP/EXPO), BIOS et pilote à jour
 - [ ] **`MODE-PARTIE.bat` avant chaque session**
