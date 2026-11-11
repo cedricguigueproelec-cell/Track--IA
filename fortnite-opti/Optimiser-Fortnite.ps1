@@ -1368,7 +1368,7 @@ function Show-DiagnosticPc {
             Write-Attention 'Intel 13e/14e gen avec un BIOS d''avant octobre 2024 : METS TON BIOS À JOUR'
             Write-Info '(correctif d''Intel contre l''instabilité et l''usure de ces processeurs, site du fabricant de ta carte mère).'
         } elseif ($dateBios -and $dateBios -lt (Get-Date).AddYears(-2)) {
-            Write-Attention 'BIOS de plus de 2 ans : une mise à jour apporte souvent stabilité et performances.'
+            Write-Attention 'BIOS de plus de 2 ans : une mise à jour apporte surtout des correctifs de sécurité et de stabilité (rarement des FPS en plus).'
         }
         if ($env:firmware_type -eq 'Legacy') {
             Write-Attention 'Windows démarre en mode « Hérité » : ne désactive PAS le CSM dans le BIOS (le PC ne démarrerait plus).'
