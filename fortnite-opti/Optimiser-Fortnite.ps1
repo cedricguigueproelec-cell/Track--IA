@@ -19,7 +19,8 @@
     Menu (défaut), Tout, Partie, Connexion, Latence, Fps, Fortnite, Pc, Diagnostic, Restaurer.
 
 .EXAMPLE
-    TWEAKS-0-DELAI.bat (tout optimiser), MODE-PARTIE.bat (avant de jouer), LANCER.bat (menu).
+    TWEAKS-0-DELAI.bat (tout optimiser), MODE-PARTIE.bat (avant de jouer),
+    RESTAURER-TOUT.bat (tout remettre comme avant), LANCER.bat (menu).
 #>
 [CmdletBinding()]
 param(
@@ -1103,7 +1104,7 @@ function Show-Fin {
     Write-Host ''
     Write-Host '  ==================== TERMINÉ ====================' -ForegroundColor Green
     Write-Info "Réglages d'origine sauvegardés dans : $script:DossierSauvegarde"
-    Write-Info 'Pour tout annuler : relance LANCER.bat et choisis « 9. Restaurer ».'
+    Write-Info 'Pour tout annuler : double-clic sur RESTAURER-TOUT.bat.'
     Write-Host ''
     Write-Attention 'AVANT CHAQUE SESSION : double-clic sur MODE-PARTIE.bat (ping au minimum pendant la partie).'
     Write-Host ''
@@ -1189,8 +1190,23 @@ function Invoke-Restauration {
         Stop-ModePartie -Silencieux
     }
     Read-Sauvegarde
-    if ($script:Sauvegarde.Count -eq 0) { Write-Attention 'Aucune sauvegarde trouvée : rien à restaurer.'; return }
-    if (-not (Read-Oui 'Remettre TOUS les réglages comme avant ?')) { return }
+    if ($script:Sauvegarde.Count -eq 0) {
+        Write-Attention 'Aucune sauvegarde trouvée : rien à restaurer.'
+        Write-Info 'Soit tout a déjà été remis comme avant, soit les tweaks n''ont jamais été appliqués sur ce PC.'
+        Write-Info 'En dernier recours : point de restauration Windows « Avant optimisation Fortnite »'
+        Write-Info '(Démarrer > tape « Créer un point de restauration » > Restauration du système).'
+        return
+    }
+    Write-Titre 'RESTAURER : tout remettre exactement comme avant les tweaks'
+    Write-Info "$($script:Sauvegarde.Count) réglage(s) d'origine sauvegardé(s) vont être remis :"
+    Write-Info '- plan et réglages d''alimentation, carte réseau, priorité réseau (QoS)'
+    Write-Info '- souris, clavier, Mode Jeu, Game Bar, planification GPU, intégrité de la mémoire'
+    Write-Info '- mises à jour Windows, applis en arrière-plan, animations, démarrage rapide, télémétrie'
+    Write-Info '- fréquence de l''écran et réglages du jeu Fortnite (si l''outil les avait changés)'
+    Write-Host ''
+    if (Test-FortniteOuvert) { Write-Attention 'Fortnite est ouvert : ferme-le avant de continuer.' }
+    Write-Attention 'Internet va couper quelques secondes (redémarrage de la carte réseau).'
+    if (-not (Read-Oui 'Remettre TOUS les réglages comme avant ?')) { Write-Info 'Annulé, rien n''a été modifié.'; return }
 
     $entrees = @($script:Sauvegarde.ToArray())
     [array]::Reverse($entrees)
@@ -1255,8 +1271,20 @@ function Invoke-Restauration {
         Write-Titre 'Écran'
         try {
             Initialize-Ecran
-            if ([OptiFortnite.Ecran]::Appliquer([int]$e.Value, $false) -eq 0) { Write-Ok "Écran remis à $($e.Value) Hz." }
-            else { $erreurs++; Write-Attention "Impossible de remettre l'écran à $($e.Value) Hz." }
+            $avant = [int]$e.Value
+            $maintenant = [int]([OptiFortnite.Ecran]::Actuel().dmDisplayFrequency)
+            if ($maintenant -eq $avant) {
+                Write-Ok "Écran déjà à $avant Hz, comme avant."
+            } else {
+                Write-Attention "L'outil avait passé ton écran de $avant Hz à $maintenant Hz."
+                Write-Info "Le remettre à $avant Hz AJOUTE du délai : chaque image arrive $([math]::Round(1000 / $avant - 1000 / $maintenant, 1)) ms plus tard."
+                if (Read-Oui "Remettre quand même l'écran à $avant Hz comme avant ?") {
+                    if ([OptiFortnite.Ecran]::Appliquer($avant, $false) -eq 0) { Write-Ok "Écran remis à $avant Hz." }
+                    else { $erreurs++; Write-Attention "Impossible de remettre l'écran à $avant Hz." }
+                } else {
+                    Write-Ok "Écran gardé à $maintenant Hz."
+                }
+            }
         } catch { $erreurs++; Write-Attention "Écran : $($_.Exception.Message)" }
     }
 
@@ -1279,10 +1307,14 @@ function Invoke-Restauration {
     if ($erreurs -eq 0) {
         Write-Host '  ============ TOUT EST REVENU COMME AVANT ============' -ForegroundColor Green
     } else {
-        Write-Attention "$erreurs réglage(s) n'ont pas pu être remis (la sauvegarde est gardée : tu peux relancer « Restaurer »)."
+        Write-Attention "$erreurs réglage(s) n'ont pas pu être remis (la sauvegarde est gardée : relance RESTAURER-TOUT.bat)."
         Write-Info 'Le point de restauration Windows « Avant optimisation Fortnite » reste aussi disponible.'
     }
-    Write-Info 'Redémarre le PC pour finaliser.'
+    Write-Info 'Seuls les fichiers temporaires supprimés ne reviennent pas (aucun effet sur les jeux).'
+    Write-Info 'La mise à jour du BIOS ne fait pas partie de l''outil : elle reste en place.'
+    Write-Host ''
+    Write-Attention 'Le REDÉMARRAGE est nécessaire pour que tout revienne vraiment comme avant.'
+    if (Read-Oui 'Redémarrer le PC maintenant ?') { Restart-Computer -Force }
 }
 
 # ---------------------------------------------------------------------------

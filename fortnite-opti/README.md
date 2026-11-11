@@ -45,6 +45,7 @@ sans pertes, et un input lag au plancher.
 |---|---|---|
 | `TWEAKS-0-DELAI.bat` | **Une fois** (et après une grosse mise à jour Windows) | Tous les tweaks du PC d'un coup, **sans toucher aux réglages du jeu** |
 | `MODE-PARTIE.bat` | **Avant chaque session** | Ping au minimum pendant que tu joues |
+| `RESTAURER-TOUT.bat` | Si tu n'es pas satisfait | Remet **tout** comme avant les tweaks, puis propose de redémarrer |
 | `LANCER.bat` | Quand tu veux | Le menu complet (catégories, diagnostic, restaurer) |
 
 ```
@@ -62,9 +63,18 @@ sans pertes, et un input lag au plancher.
    0. Quitter
 ```
 
-**Pour tout annuler : 9. Restaurer.** Chaque valeur d'origine est sauvegardée dans
+**Pour tout annuler : double-clic sur `RESTAURER-TOUT.bat`** (ou choix 9 du menu), puis
+**redémarre** le PC. Chaque valeur d'origine est sauvegardée dans
 `C:\Users\<toi>\FortniteOpti-Sauvegarde\` avant d'être modifiée, et un point de
 restauration Windows « Avant optimisation Fortnite » est créé en plus.
+
+Ce que `RESTAURER-TOUT.bat` remet comme avant : alimentation, carte réseau, priorité
+réseau, souris, clavier, Mode Jeu, Game Bar, planification GPU, intégrité de la mémoire,
+mises à jour Windows, applis en arrière-plan, animations, démarrage rapide, télémétrie,
+réglages du jeu (si l'outil les avait changés). Pour l'**écran**, il te demande : le remettre
+à son ancienne fréquence (60 Hz par exemple) **ajoute** du délai, donc c'est ton choix. Seuls les
+fichiers temporaires supprimés ne reviennent pas (aucun effet sur les jeux), et la mise à
+jour du BIOS, qui ne fait pas partie de l'outil, reste en place.
 
 ### La question qu'on te pose (ton choix)
 
