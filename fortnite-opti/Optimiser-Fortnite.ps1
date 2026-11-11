@@ -1184,6 +1184,34 @@ function Invoke-Tout {
 # ---------------------------------------------------------------------------
 # Restauration
 # ---------------------------------------------------------------------------
+# Explique précisément pourquoi il n'y a rien à restaurer.
+function Show-RienARestaurer {
+    Write-Titre 'Rien à restaurer'
+    $archives = @()
+    if (Test-Path -LiteralPath $script:DossierSauvegarde) {
+        $archives = @(Get-ChildItem -LiteralPath $script:DossierSauvegarde -Filter 'sauvegarde-restauree-*.json' -ErrorAction SilentlyContinue |
+            Sort-Object -Property Name -Descending)
+    }
+    if ($archives.Count -gt 0) {
+        $quand = $null
+        if ($archives[0].Name -match '(\d{8}-\d{6})') {
+            $quand = [datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
+        }
+        if ($quand) { Write-Ok ('Tout a DÉJÀ été remis comme avant, le {0:dd/MM/yyyy} à {0:HH:mm}.' -f $quand) }
+        else { Write-Ok 'Tout a DÉJÀ été remis comme avant.' }
+        Write-Info 'Aucun réglage des tweaks n''est encore actif sur ton PC : il n''y a plus rien à remettre.'
+        Write-Info '(Si tu n''avais pas redémarré depuis, redémarre maintenant pour finaliser.)'
+    } else {
+        Write-Ok 'Les tweaks n''ont JAMAIS été appliqués sur ce compte Windows : rien n''a été modifié.'
+        Write-Info 'C''est le cas si tu as répondu N, appuyé sur Entrée ou fermé la fenêtre à la question'
+        Write-Info '« Lancer l''optimisation complète ? (O/N) ». Ton PC est donc déjà exactement comme avant.'
+    }
+    Write-Info "Dossier vérifié : $($script:DossierSauvegarde)"
+    Write-Host ''
+    Write-Info 'Le délai que tu ressens ne vient donc pas des tweaks. Lance LANCER.bat > 8. Diagnostic'
+    Write-Info '(écran, Wi-Fi ou câble, ping, pertes) et active les statistiques réseau dans Fortnite.'
+}
+
 function Invoke-Restauration {
     if ((Test-Path -LiteralPath $script:FichierPartie) -and -not (Test-PartieActive)) {
         Write-Titre 'Mode partie'
@@ -1191,10 +1219,7 @@ function Invoke-Restauration {
     }
     Read-Sauvegarde
     if ($script:Sauvegarde.Count -eq 0) {
-        Write-Attention 'Aucune sauvegarde trouvée : rien à restaurer.'
-        Write-Info 'Soit tout a déjà été remis comme avant, soit les tweaks n''ont jamais été appliqués sur ce PC.'
-        Write-Info 'En dernier recours : point de restauration Windows « Avant optimisation Fortnite »'
-        Write-Info '(Démarrer > tape « Créer un point de restauration » > Restauration du système).'
+        Show-RienARestaurer
         return
     }
     Write-Titre 'RESTAURER : tout remettre exactement comme avant les tweaks'
