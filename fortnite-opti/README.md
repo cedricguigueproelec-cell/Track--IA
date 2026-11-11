@@ -1,4 +1,4 @@
-# Optimisation Fortnite v3 : ping, latence, FPS
+# Optimisation Fortnite v4 : tweaks 0 délai (ping, latence, FPS, édition)
 
 Un outil Windows **en un clic**, **sûr et 100 % réversible**, plus le guide des réglages
 qui comptent vraiment pour réduire le délai entre ton clic et l'action à l'écran.
@@ -31,14 +31,23 @@ sans pertes, et un input lag au plancher.
 
 1. Télécharge le zip, puis **clic droit dessus > Propriétés > coche « Débloquer »**, puis extrais-le.
 2. Ferme Fortnite.
-3. Double-clic sur **`LANCER.bat`**, puis réponds **Oui** à la fenêtre administrateur.
-4. (Conseillé) **8. Diagnostic** pour voir ton point de départ.
-5. **1. TOUT OPTIMISER** (une seule fois). L'outil te pose **2 questions** (voir plus bas), puis fait tout seul.
-6. **Redémarre le PC** (l'outil te le propose).
+3. (Conseillé) Double-clic sur **`LANCER.bat`** > **8. Diagnostic** pour voir ton point de
+   départ (BIOS, RAM, pilote, écran, ping).
+4. **Double-clic sur `TWEAKS-0-DELAI.bat`** (une seule fois), puis réponds **Oui** à la fenêtre
+   administrateur. L'outil te pose **2 questions** (voir plus bas), puis fait tout seul.
+   Si ton écran change de fréquence, appuie sur **O** pour garder.
+5. **Redémarre le PC** (l'outil te le propose).
+6. Règle une fois les options de **construction / édition** dans Fortnite (section 4).
 7. **Avant chaque session de jeu : double-clic sur `MODE-PARTIE.bat`** (voir plus bas).
 
+| Fichier | Quand | Ce qu'il fait |
+|---|---|---|
+| `TWEAKS-0-DELAI.bat` | **Une fois** (et après une grosse mise à jour Windows) | Tous les tweaks d'un coup |
+| `MODE-PARTIE.bat` | **Avant chaque session** | Ping au minimum pendant que tu joues |
+| `LANCER.bat` | Quand tu veux | Le menu complet (catégories, diagnostic, restaurer) |
+
 ```
-   1. TOUT OPTIMISER EN UN CLIC  (à faire une fois)
+   1. TWEAKS 0 DÉLAI : TOUT OPTIMISER EN UN CLIC  (à faire une fois)
    2. MODE PARTIE  (avant chaque session : ping au minimum)
 
    3. Connexion  : réduire le ping et les pics de lag
@@ -47,7 +56,7 @@ sans pertes, et un input lag au plancher.
    6. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)
    7. PC complet : Windows plus léger + nettoyage
 
-   8. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes
+   8. Diagnostic : BIOS, RAM, pilote, écran, Wi-Fi/câble, ping
    9. Restaurer  : tout remettre comme avant
    0. Quitter
 ```
@@ -78,10 +87,11 @@ Pendant la session :
 | Action | Pourquoi | Gain |
 |---|---|---|
 | Ferme les applis qui utilisent ta connexion en fond (OneDrive, Google Drive, Dropbox, torrents, Steam, EA app, Battle.net, Ubisoft Connect...) | Une synchro ou un téléchargement sature la connexion = pics de ping. Steam ne met **pas** ses téléchargements en pause pour Fortnite | **Énorme** si une de ces applis tournait |
+| Ferme Overwolf et Corsair iCUE s'ils tournent | Overlay et logiciel RGB qui prennent du processeur / causent des micro-saccades | Moyen |
 | Arrête les téléchargements de Windows Update | Pas de mise à jour de 3 Go qui démarre en pleine partie | Moyen à énorme |
 | **En Wi-Fi :** coupe la recherche de réseaux en arrière-plan (tu restes connecté) | Windows cherche d'autres réseaux toutes les ~60 s, ce qui crée un pic de ping régulier | **Gros** en Wi-Fi |
 
-À la fin, la synchro de fichiers (OneDrive...) est relancée et le Wi-Fi remis comme avant.
+À la fin, la synchro de fichiers (OneDrive...) et iCUE sont relancés et le Wi-Fi remis comme avant.
 **Sécurité :** si tu fermes la fenêtre ou redémarres le PC sans appuyer sur Entrée, le Wi-Fi
 est remis automatiquement au prochain démarrage (et au prochain lancement de l'outil).
 Pendant le Mode Partie en Wi-Fi, si la connexion coupe, elle ne se rétablit pas toute seule :
@@ -107,6 +117,7 @@ appuie sur Entrée dans la fenêtre.
 
 | Réglage | Pourquoi | Gain |
 |---|---|---|
+| **Écran mis à sa fréquence maximale** (ex. 60 → 144 Hz), avec retour automatique si l'image disparaît | Chaque image arrive plus vite : 60 → 144 Hz = ~10 ms de moins par image | **Énorme** si ton écran était bridé |
 | Accélération souris Windows coupée | Mouvement 1:1, menus et éditions cohérents | Confort |
 | Raccourci « touches rémanentes » coupé | Plus de pop-up qui te sort du jeu quand tu spammes Maj | Confort |
 | Planification GPU accélérée par le matériel | Moins de travail CPU pour piloter la carte graphique | Faible |
@@ -152,9 +163,19 @@ Fortnite doit avoir été lancé au moins une fois, et être **fermé** pendant 
 Beaucoup de « packs de tweaks » sur YouTube font plus de mal que de bien :
 
 - **Désactiver l'antivirus, le pare-feu ou les mises à jour de sécurité** : dangereux, aucun gain réel en jeu.
-- **Désactiver les protections CPU (Spectre/Meltdown), toucher à `bcdedit` (HPET, dynamic
-  tick, useplatformclock), forcer une « timer resolution »** : effets contradictoires, ça peut
-  **augmenter** la latence.
+- **Désactiver les protections CPU (Spectre/Meltdown)** : vrai risque de sécurité, gain quasi nul.
+- **`bcdedit` (HPET, dynamic tick, useplatformclock)** : effets contradictoires, ça peut
+  **augmenter** la latence ; et modifier la configuration de démarrage peut déclencher une
+  demande de **clé de récupération BitLocker** au redémarrage (PC bloqué si tu ne l'as pas).
+- **« Timer resolution » (ISLC, TimerResolution.exe)** : depuis Windows 10 2004 / Windows 11,
+  ce réglage ne s'applique plus qu'au programme qui le demande, et Fortnite règle déjà le sien.
+- **`MouseDataQueueSize` / `KeyboardDataQueueSize`** : c'est une file d'attente, pas un délai.
+  La réduire ne rend rien plus rapide, et trop basse elle **fait perdre des clics** avec les
+  souris à 4000/8000 Hz.
+- **Mode MSI / affinité des interruptions** : gain de quelques microsecondes, et un mauvais
+  réglage peut donner un **écran bleu au démarrage**.
+- **`Win32PrioritySeparation`** : la valeur « magique » des vidéos (0x26) fait la même chose que
+  le réglage par défaut de Windows.
 - **Les tweaks « Nagle » / `TcpAckFrequency` / TCP** : la partie de Fortnite passe par UDP, ça ne change rien.
 - **Changer de DNS** : aucun effet sur le ping en partie.
 - **Modifier les fichiers du jeu ou forcer sa priorité via des clés spéciales** : risque avec
@@ -164,7 +185,33 @@ Beaucoup de « packs de tweaks » sur YouTube font plus de mal que de bien :
 
 ---
 
-## 4. À vérifier une fois dans Fortnite
+## 4. Construction et édition : le moins de délai possible
+
+Ces options sont sauvegardées **dans le cloud d'Epic** : aucun fichier ne peut les changer à
+ta place, il faut les régler **une fois** dans **Paramètres > Jeu** (l'outil te les rappelle).
+
+| Réglage | Valeur | Pourquoi |
+|---|---|---|
+| **Éditer au relâchement** (« Edit on Release ») | **Activé** | L'édition se valide dès que tu lâches la touche : **LE** réglage pour éditer vite |
+| Construction turbo (« Turbo Building ») | **Activé** | Construit en continu en maintenant le clic |
+| Changement de matériau auto (« Auto Material Change ») | **Activé** | Plus de blocage quand un matériau est vide |
+| Réinitialiser le choix de construction (« Reset Building Choice ») | **Désactivé** | Garde la dernière pièce choisie |
+| Rediffusions (« Replays ») | **Enregistrement désactivé** | Moins de travail pour le PC pendant la partie |
+
+**Touches :** édition sur une touche facile (F, E ou bouton latéral de la souris), murs et
+escaliers sur les boutons latéraux pour ne pas lâcher ZQSD. Garde la **même sensibilité**
+en construction et en édition qu'en visée, pour que tes gestes restent les mêmes.
+
+**Matériel qui compte pour l'édition :** souris réglée à **1000 Hz** minimum (logiciel de la
+souris), écran à sa fréquence max (l'outil le fait), FPS stables.
+
+**Le réseau compte aussi :** chaque édition est **validée par le serveur**. Avec 15-30 ms de
+ping, elle paraît instantanée ; au-delà de ~50 ms, tu sentiras toujours un petit retard, quels
+que soient les tweaks. D'où le **câble Ethernet**, la **bonne région** et le **Mode Partie**.
+
+---
+
+## 5. À vérifier une fois dans Fortnite
 
 **Paramètres > Vidéo :**
 
@@ -187,7 +234,7 @@ Beaucoup de « packs de tweaks » sur YouTube font plus de mal que de bien :
 
 ---
 
-## 5. Réglages de la carte graphique
+## 6. Réglages de la carte graphique
 
 ### NVIDIA (Panneau de configuration NVIDIA > Gérer les paramètres 3D > Fortnite)
 - Mode de gestion de l'alimentation : **Performances maximales préférées**
@@ -209,7 +256,7 @@ Mets le pilote graphique à jour une fois par mois (NVIDIA App ou AMD Adrenalin)
 
 ---
 
-## 6. Réseau : le seul vrai levier sur le ping
+## 7. Réseau : le seul vrai levier sur le ping
 
 1. **Câble Ethernet (RJ45) entre le PC et la box.** Changement n°1 : le Wi-Fi crée des pics
    et de la gigue. Un câble Cat 6 de 10-15 m coûte moins de 10 €. Sinon : Wi-Fi **5 GHz**
@@ -238,21 +285,35 @@ Mets le pilote graphique à jour une fois par mois (NVIDIA App ou AMD Adrenalin)
 
 ---
 
-## 7. Matériel
+## 8. Matériel et BIOS
 
-- **Écran** : à sa fréquence max (le diagnostic te le dit). Un écran 144 Hz réglé à 60 Hz est
-  une erreur très fréquente. Active le mode jeu / overdrive de l'écran.
-- **Souris** : taux d'interrogation (polling rate) à **1000 Hz** dans le logiciel de la souris,
-  branchée directement sur le PC.
+- **Écran** : l'outil le met à sa fréquence max. Active aussi le mode jeu / overdrive dans le
+  menu de l'écran (boutons de l'écran).
+- **Souris** : taux d'interrogation (polling rate) à **1000 Hz** minimum dans le logiciel de la
+  souris, branchée directement sur le PC.
 - **PC portable** : toujours **branché**, mode « Performance » du logiciel constructeur.
-- **RAM** : si tu sais aller dans le BIOS, active **XMP** (Intel) / **EXPO** (AMD). Sans ça, la
-  RAM tourne souvent bien en dessous de sa vitesse : gros gain de FPS sur Fortnite.
+- **Une seule barrette de RAM** = mode simple canal = grosse perte de FPS (le diagnostic le dit).
+
+**BIOS** (touche Suppr ou F2 au démarrage). Aucun script ne peut le régler : chaque carte mère
+a ses menus et un mauvais réglage peut empêcher le PC de démarrer. Le diagnostic te dit quoi
+faire ; dans l'ordre :
+
+1. **XMP (Intel) / EXPO (AMD)** si le diagnostic dit « RAM bridée » : souvent le plus gros gain
+   de FPS gratuit. Si le PC ne démarre pas, il revient seul aux anciens réglages après quelques essais.
+2. **Mettre le BIOS à jour**, surtout sur Intel Core 13e/14e gen (correctif d'instabilité
+   d'Intel). Ne jamais couper le courant pendant la mise à jour.
+3. **Resizable BAR** (+ « Above 4G Decoding ») : petit gain sur les cartes récentes,
+   **uniquement si le diagnostic affiche « Mode de démarrage : UEFI »**.
+4. **À ne pas toucher** : overclock manuel, tensions, C-States, HPET. Sur Intel 13e/14e gen,
+   aucun overclock.
 
 ---
 
 ## Checklist rapide
 
-- [ ] `LANCER.bat` > **1. TOUT OPTIMISER** + PC redémarré
+- [ ] **`TWEAKS-0-DELAI.bat`** + PC redémarré
+- [ ] Construction : **Éditer au relâchement**, Construction turbo, Changement de matériau auto
+- [ ] Diagnostic : RAM pas bridée (XMP/EXPO), BIOS et pilote à jour
 - [ ] **`MODE-PARTIE.bat` avant chaque session**
 - [ ] Câble Ethernet
 - [ ] Écran à sa fréquence max

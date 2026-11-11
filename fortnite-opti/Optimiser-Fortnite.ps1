@@ -3,7 +3,7 @@
     Optimisation complète du PC pour Fortnite : ping, latence (input lag), FPS.
 
 .DESCRIPTION
-    Version 3. Menu par catégories + un bouton « TOUT OPTIMISER » + un
+    Version 4. Menu par catégories + un bouton « TOUT OPTIMISER » + un
     « MODE PARTIE » à lancer avant chaque session (ping au minimum).
 
     N'applique que des réglages documentés et 100 % réversibles : chaque valeur
@@ -19,7 +19,7 @@
     Menu (défaut), Tout, Partie, Connexion, Latence, Fps, Fortnite, Pc, Diagnostic, Restaurer.
 
 .EXAMPLE
-    Double-clic sur LANCER.bat (menu) ou MODE-PARTIE.bat (avant de jouer).
+    TWEAKS-0-DELAI.bat (tout optimiser), MODE-PARTIE.bat (avant de jouer), LANCER.bat (menu).
 #>
 [CmdletBinding()]
 param(
@@ -59,9 +59,11 @@ $script:AppsGourmandes = [ordered]@{
     'Battle.net'      = 'Battle.net (téléchargements)'
     'upc'             = 'Ubisoft Connect (téléchargements)'
     'GalaxyClient'    = 'GOG Galaxy (téléchargements)'
+    'Overwolf'        = 'Overwolf (overlay : prend du processeur pendant le jeu)'
+    'iCUE'            = 'Corsair iCUE (logiciel RGB : connu pour des micro-saccades)'
 }
 # Celles-ci tournent normalement en permanence : on les relance à la fin de la partie.
-$script:AppsARelancer = @('OneDrive', 'Dropbox', 'GoogleDriveFS', 'iCloudDrive', 'MEGAsync')
+$script:AppsARelancer = @('OneDrive', 'Dropbox', 'GoogleDriveFS', 'iCloudDrive', 'MEGAsync', 'iCUE')
 
 $script:Sauvegarde = New-Object System.Collections.ArrayList
 $script:DejaSauve  = @{}
@@ -79,6 +81,7 @@ $script:DetailsConnexion = @(
     'Mises à jour Windows en arrière-plan limitées à 20 % de ta connexion'
 )
 $script:DetailsLatence = @(
+    'Écran réglé automatiquement à sa fréquence maximale (144 / 165 / 240 Hz...)'
     'Accélération de la souris Windows coupée (mouvement 1:1)'
     'Raccourcis « touches rémanentes » coupés (plus de pop-up en pleine partie avec Maj)'
     'Planification GPU accélérée par le matériel activée'
@@ -125,7 +128,7 @@ function Write-Section([string]$Texte) {
 function Write-Banniere {
     Write-Host ''
     Write-Host '  ==================================================' -ForegroundColor Magenta
-    Write-Host '     OPTIMISATION FORTNITE v3  -  ping / latence / FPS' -ForegroundColor Magenta
+    Write-Host '     OPTIMISATION FORTNITE v4  -  ping / latence / FPS' -ForegroundColor Magenta
     Write-Host '  ==================================================' -ForegroundColor Magenta
     Write-Host ''
 }
@@ -542,7 +545,7 @@ function Start-ModePartie {
     $etat = [ordered]@{ Pid = $PID; Wifi = @(); Apps = @() }
 
     # 1. Applis qui utilisent la connexion en fond
-    Write-Titre 'Applis qui utilisent ta connexion en fond'
+    Write-Titre 'Applis qui utilisent ta connexion ou ton PC en fond'
     $trouvees = @()
     foreach ($nom in $script:AppsGourmandes.Keys) {
         $p = Get-Process -Name $nom -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -552,7 +555,7 @@ function Start-ModePartie {
         Write-Ok 'Aucune appli gourmande ouverte.'
     } else {
         foreach ($a in $trouvees) { Write-Info "- $($a.Nom)" }
-        if (Read-Oui 'Les fermer pendant la partie (la synchro de fichiers sera relancée à la fin) ?') {
+        if (Read-Oui 'Les fermer pendant la partie (synchro de fichiers et RGB relancés à la fin) ?') {
             foreach ($a in $trouvees) {
                 Close-Appli $a.Processus
                 Write-Ok "$($a.Nom) fermé."
@@ -603,6 +606,137 @@ function Start-ModePartie {
 # ---------------------------------------------------------------------------
 # LATENCE
 # ---------------------------------------------------------------------------
+function Initialize-Ecran {
+    if ('OptiFortnite.Ecran' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace OptiFortnite {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct DEVMODE {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public short dmSpecVersion;
+        public short dmDriverVersion;
+        public short dmSize;
+        public short dmDriverExtra;
+        public int dmFields;
+        public int dmPositionX;
+        public int dmPositionY;
+        public int dmDisplayOrientation;
+        public int dmDisplayFixedOutput;
+        public short dmColor;
+        public short dmDuplex;
+        public short dmYResolution;
+        public short dmTTOption;
+        public short dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public short dmLogPixels;
+        public int dmBitsPerPel;
+        public int dmPelsWidth;
+        public int dmPelsHeight;
+        public int dmDisplayFlags;
+        public int dmDisplayFrequency;
+        public int dmICMMethod;
+        public int dmICMIntent;
+        public int dmMediaType;
+        public int dmDitherType;
+        public int dmReserved1;
+        public int dmReserved2;
+        public int dmPanningWidth;
+        public int dmPanningHeight;
+    }
+
+    public static class Ecran {
+        const int ENUM_CURRENT_SETTINGS = -1;
+        const int DM_BITSPERPEL = 0x40000, DM_PELSWIDTH = 0x80000, DM_PELSHEIGHT = 0x100000, DM_DISPLAYFREQUENCY = 0x400000;
+        const int CDS_UPDATEREGISTRY = 0x1, CDS_TEST = 0x2;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern int ChangeDisplaySettingsEx(string deviceName, ref DEVMODE devMode, IntPtr hwnd, int flags, IntPtr lParam);
+
+        static DEVMODE Vide() {
+            DEVMODE d = new DEVMODE();
+            d.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+            return d;
+        }
+
+        // Écran principal : mode actuel.
+        public static DEVMODE Actuel() {
+            DEVMODE d = Vide();
+            if (!EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref d)) throw new Exception("mode d'affichage illisible");
+            return d;
+        }
+
+        // Fréquence la plus haute proposée pour la résolution et les couleurs actuelles.
+        public static int FrequenceMax() {
+            DEVMODE actuel = Actuel();
+            int max = actuel.dmDisplayFrequency;
+            DEVMODE m = Vide();
+            for (int i = 0; EnumDisplaySettings(null, i, ref m); i++) {
+                if (m.dmPelsWidth == actuel.dmPelsWidth && m.dmPelsHeight == actuel.dmPelsHeight &&
+                    m.dmBitsPerPel == actuel.dmBitsPerPel && m.dmDisplayFrequency > max) {
+                    max = m.dmDisplayFrequency;
+                }
+                m = Vide();
+            }
+            return max;
+        }
+
+        // 0 = réussi. test = vérifie seulement que le pilote accepte.
+        public static int Appliquer(int frequence, bool test) {
+            DEVMODE d = Actuel();
+            d.dmDisplayFrequency = frequence;
+            d.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
+            return ChangeDisplaySettingsEx(null, ref d, IntPtr.Zero, test ? CDS_TEST : CDS_UPDATEREGISTRY, IntPtr.Zero);
+        }
+    }
+}
+'@
+}
+
+# Attend que l'utilisateur confirme qu'il voit l'image (sinon on revient en arrière).
+function Confirm-Ecran([int]$Secondes) {
+    Write-Attention "Tu vois bien ce texte ? Appuie sur O pour GARDER (sinon retour automatique dans $Secondes s)."
+    try {
+        while ([Console]::KeyAvailable) { [void][Console]::ReadKey($true) }
+        $fin = (Get-Date).AddSeconds($Secondes)
+        while ((Get-Date) -lt $fin) {
+            if ([Console]::KeyAvailable) {
+                $touche = [string][Console]::ReadKey($true).KeyChar
+                if ($touche -match '^[oOyY]$') { return $true }
+                if ($touche -match '^[nN]$') { return $false }
+            }
+            Start-Sleep -Milliseconds 100
+        }
+        return $false
+    } catch {
+        return (Read-Oui 'Garder ce réglage ?')
+    }
+}
+
+function Set-FrequenceEcranMax {
+    Initialize-Ecran
+    $avant = [int]([OptiFortnite.Ecran]::Actuel().dmDisplayFrequency)
+    $max = [OptiFortnite.Ecran]::FrequenceMax()
+    if ($max -le $avant) { Write-Ok "Écran déjà à sa fréquence maximale ($avant Hz)."; return }
+    if ([OptiFortnite.Ecran]::Appliquer($max, $true) -ne 0) {
+        Write-Attention "Le pilote refuse $max Hz (câble ou port trop ancien ?) : on reste à $avant Hz."
+        return
+    }
+    Add-Entree -Id 'DISPLAY|PRINCIPAL' -Kind 'Display' -Value $avant
+    $code = [OptiFortnite.Ecran]::Appliquer($max, $false)
+    if ($code -ne 0) { throw "changement de fréquence refusé (code $code)" }
+    Write-Ok "Écran passé de $avant Hz à $max Hz."
+    if (Confirm-Ecran 15) {
+        Write-Ok "$max Hz gardés : chaque image arrive $([math]::Round(1000 / $avant - 1000 / $max, 1)) ms plus tôt à l'écran."
+    } else {
+        [void][OptiFortnite.Ecran]::Appliquer($avant, $false)
+        Write-Attention "Pas de confirmation : retour à $avant Hz."
+    }
+}
+
 function Update-Souris {
     Initialize-Natif
     $p = Get-ItemProperty -LiteralPath 'HKCU:\Control Panel\Mouse'
@@ -838,6 +972,21 @@ function Set-ConfigFortnite {
     }
 }
 
+function Show-ReglagesConstruction {
+    Write-Host ''
+    Write-Attention 'CONSTRUCTION / ÉDITION : à régler une fois dans Fortnite (Paramètres > Jeu).'
+    Write-Info 'Epic les sauvegarde dans son cloud : aucun fichier ne peut les changer à ta place.'
+    Write-Info ' - Éditer au relâchement (« Edit on Release ») : ACTIVÉ   <- LE réglage pour éditer vite'
+    Write-Info ' - Construction turbo (« Turbo Building ») : ACTIVÉ'
+    Write-Info ' - Changement de matériau auto (« Auto Material Change ») : ACTIVÉ'
+    Write-Info ' - Réinitialiser le choix de construction (« Reset Building Choice ») : DÉSACTIVÉ'
+    Write-Info ' - Touche d''édition sur une touche facile (F, E ou bouton latéral de la souris)'
+    Write-Info ' - Murs et escaliers sur les boutons latéraux de la souris (sans lâcher ZQSD)'
+    Write-Info ' - Rediffusions (« Replays ») : enregistrement DÉSACTIVÉ (moins de travail pour le PC)'
+    Write-Info 'Les éditions sont validées par le serveur : au-delà de ~50 ms de ping, tu sentiras toujours'
+    Write-Info 'un petit retard. D''où le câble Ethernet + la bonne région + le Mode Partie.'
+}
+
 function Show-ReglagesManuelsFortnite {
     Write-Info 'À vérifier une fois dans le jeu (Paramètres > Vidéo) :'
     Write-Info ' - Mode de rendu : « Performance » (le plus réactif)'
@@ -916,6 +1065,7 @@ function Invoke-SectionConnexion {
 
 function Invoke-SectionLatence {
     Write-Section 'LATENCE : supprimer le délai (input lag)'
+    Invoke-Etape 'Fréquence de l''écran' { Set-FrequenceEcranMax }
     Invoke-Etape 'Souris' { Set-Souris }
     Invoke-Etape 'Touches rémanentes' { Set-TouchesRemanentes }
     Invoke-Etape 'Planification GPU' { Set-Hags }
@@ -936,6 +1086,7 @@ function Invoke-SectionFortnite {
     Write-Section 'FORTNITE : réglages du jeu'
     Invoke-Etape 'Fichier de réglages de Fortnite' { Set-ConfigFortnite }
     Show-ReglagesManuelsFortnite
+    Show-ReglagesConstruction
 }
 
 function Invoke-SectionPc {
@@ -979,7 +1130,7 @@ function Invoke-Application([string]$Titre, [string[]]$Details, [scriptblock]$Se
 }
 
 function Invoke-Tout {
-    Write-Titre 'TOUT OPTIMISER : voici tout ce qui va être fait'
+    Write-Titre 'TWEAKS 0 DÉLAI : voici tout ce qui va être fait'
     Write-Host '   Connexion' -ForegroundColor White;  foreach ($l in $script:DetailsConnexion) { Write-Info "- $l" }
     Write-Host '   Latence' -ForegroundColor White;    foreach ($l in $script:DetailsLatence)   { Write-Info "- $l" }
     Write-Host '   FPS' -ForegroundColor White;        foreach ($l in $script:DetailsFps)       { Write-Info "- $l" }
@@ -1075,6 +1226,15 @@ function Invoke-Restauration {
         try { Restart-NetAdapter -Name $nomCarte -Confirm:$false; Write-Ok "$nomCarte : réglages d'origine remis." } catch { $erreurs++ }
     }
 
+    foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'Display' })) {
+        Write-Titre 'Écran'
+        try {
+            Initialize-Ecran
+            if ([OptiFortnite.Ecran]::Appliquer([int]$e.Value, $false) -eq 0) { Write-Ok "Écran remis à $($e.Value) Hz." }
+            else { $erreurs++; Write-Attention "Impossible de remettre l'écran à $($e.Value) Hz." }
+        } catch { $erreurs++; Write-Attention "Écran : $($_.Exception.Message)" }
+    }
+
     Write-Titre 'Fortnite'
     foreach ($e in @($entrees | Where-Object { $_.Kind -eq 'File' })) {
         if (Test-FortniteOuvert) { $erreurs++; Write-Attention 'Fortnite est ouvert : ses réglages n''ont pas été remis.'; continue }
@@ -1168,7 +1328,74 @@ function Measure-Tcp([string]$Hote, [int]$Port = 443, [int]$Essais = 5) {
     return $meilleur
 }
 
+function Show-DiagnosticPc {
+    Write-Titre 'Carte mère et BIOS'
+    try {
+        $carte = Get-CimInstance -ClassName Win32_BaseBoard | Select-Object -First 1
+        $bios = Get-CimInstance -ClassName Win32_BIOS | Select-Object -First 1
+        $cpu = ([string](Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1 -ExpandProperty Name)).Trim()
+        $dateBios = $bios.ReleaseDate
+        Write-Info ('Carte mère : {0} {1}' -f $carte.Manufacturer, $carte.Product)
+        if ($dateBios) { Write-Info ('BIOS : {0} du {1:dd/MM/yyyy}' -f $bios.SMBIOSBIOSVersion, $dateBios) }
+        Write-Info ('Mode de démarrage : {0}' -f $env:firmware_type)
+        Write-Info ('Processeur : {0}' -f $cpu)
+        if ($cpu -match 'i[3579]-1[34]\d{3}(KS|KF|K|F|T)?(\s|$)' -and $dateBios -and $dateBios -lt [datetime]'2024-10-01') {
+            Write-Attention 'Intel 13e/14e gen avec un BIOS d''avant octobre 2024 : METS TON BIOS À JOUR'
+            Write-Info '(correctif d''Intel contre l''instabilité et l''usure de ces processeurs, site du fabricant de ta carte mère).'
+        } elseif ($dateBios -and $dateBios -lt (Get-Date).AddYears(-2)) {
+            Write-Attention 'BIOS de plus de 2 ans : une mise à jour apporte souvent stabilité et performances.'
+        }
+        if ($env:firmware_type -eq 'Legacy') {
+            Write-Attention 'Windows démarre en mode « Hérité » : ne désactive PAS le CSM dans le BIOS (le PC ne démarrerait plus).'
+        }
+    } catch { Write-Attention "Infos carte mère / BIOS illisibles : $($_.Exception.Message)" }
+
+    Write-Titre 'Mémoire vive (RAM)'
+    try {
+        $barrettes = @(Get-CimInstance -ClassName Win32_PhysicalMemory)
+        if ($barrettes.Count -eq 0) { throw 'aucune barrette détectée' }
+        $totalGo = [math]::Round((($barrettes | Measure-Object -Property Capacity -Sum).Sum) / 1GB)
+        $vitesse = [int](($barrettes | ForEach-Object { [int]$_.ConfiguredClockSpeed } | Measure-Object -Minimum).Minimum)
+        $type = switch ([int]$barrettes[0].SMBIOSMemoryType) { 34 { 'DDR5' } 26 { 'DDR4' } 24 { 'DDR3' } default { 'DDR' } }
+        Write-Info ('{0} Go, {1} barrette(s), {2} à {3} MT/s' -f $totalGo, $barrettes.Count, $type, $vitesse)
+
+        if ($barrettes.Count -eq 1) {
+            Write-Attention 'Une seule barrette = mode « simple canal » : grosse perte de FPS. Ajoute une 2e barrette IDENTIQUE.'
+        }
+        if ($totalGo -lt 16) { Write-Attention 'Moins de 16 Go : Fortnite et Windows sont à l''étroit (saccades). 16 Go conseillés.' }
+
+        # Vitesse annoncée dans la référence de la barrette (ex. CMK16GX4M2B3200C16 -> 3200).
+        $annoncee = 0
+        foreach ($b in $barrettes) {
+            foreach ($m in [regex]::Matches([string]$b.PartNumber, '(?<!\d)(2[4-9]\d{2}|[3-8]\d{3})(?!\d)')) {
+                if ([int]$m.Value -gt $annoncee) { $annoncee = [int]$m.Value }
+            }
+        }
+        if ($vitesse -gt 0 -and $annoncee -gt ($vitesse + 100)) {
+            Write-Attention "RAM BRIDÉE : elle tourne à $vitesse MT/s alors que sa référence indique $annoncee."
+            Write-Info 'Active XMP (Intel) / EXPO (AMD) dans le BIOS : gros gain de FPS gratuit.'
+        } elseif (($type -eq 'DDR4' -and $vitesse -gt 0 -and $vitesse -le 2666) -or ($type -eq 'DDR5' -and $vitesse -gt 0 -and $vitesse -le 4800)) {
+            Write-Attention "RAM à $vitesse MT/s : si elle est vendue plus rapide (écrit sur la barrette ou la boîte),"
+            Write-Info 'active XMP (Intel) / EXPO (AMD) dans le BIOS : gros gain de FPS gratuit.'
+        } else {
+            Write-Ok 'Vitesse de la RAM cohérente.'
+        }
+    } catch { Write-Attention "Infos mémoire illisibles : $($_.Exception.Message)" }
+
+    Write-Titre 'Pilote graphique'
+    try {
+        foreach ($g in @(Get-CimInstance -ClassName Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA|AMD|Radeon|Arc' })) {
+            Write-Info ('{0} : pilote {1} du {2:dd/MM/yyyy}' -f $g.Name, $g.DriverVersion, $g.DriverDate)
+            if ($g.DriverDate -and $g.DriverDate -lt (Get-Date).AddMonths(-6)) {
+                Write-Attention 'Pilote de plus de 6 mois : mets-le à jour (NVIDIA App / AMD Adrenalin), c''est gratuit et ça compte.'
+            }
+        }
+    } catch { }
+}
+
 function Invoke-Diagnostic {
+    Show-DiagnosticPc
+
     Write-Titre 'Écran'
     try {
         $gpus = @(Get-CimInstance -ClassName Win32_VideoController | Where-Object { $_.CurrentRefreshRate -gt 0 })
@@ -1268,7 +1495,7 @@ function Show-Menu {
     while ($true) {
         Clear-Host
         Write-Banniere
-        Write-Host '   1. TOUT OPTIMISER EN UN CLIC  (à faire une fois)' -ForegroundColor Green
+        Write-Host '   1. TWEAKS 0 DÉLAI : TOUT OPTIMISER EN UN CLIC  (à faire une fois)' -ForegroundColor Green
         Write-Host '   2. MODE PARTIE  (avant chaque session : ping au minimum)' -ForegroundColor Green
         Write-Host ''
         Write-Host '   3. Connexion  : réduire le ping et les pics de lag'
@@ -1277,7 +1504,7 @@ function Show-Menu {
         Write-Host '   6. Fortnite   : réglages du jeu (plein écran, V-Sync, Reflex...)'
         Write-Host '   7. PC complet : Windows plus léger + nettoyage'
         Write-Host ''
-        Write-Host '   8. Diagnostic : écran, Wi-Fi ou câble, ping, gigue, pertes'
+        Write-Host '   8. Diagnostic : BIOS, RAM, pilote, écran, Wi-Fi/câble, ping'
         Write-Host '   9. Restaurer  : tout remettre comme avant'
         Write-Host '   0. Quitter'
         Write-Host ''
@@ -1310,7 +1537,7 @@ if (-not (Test-Admin)) {
     exit
 }
 
-try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v3' } catch { }
+try { $Host.UI.RawUI.WindowTitle = 'Optimisation Fortnite v4' } catch { }
 
 # Mode partie mal fermé (fenêtre fermée, PC redémarré) : on remet le Wi-Fi normal.
 if ($Action -ne 'Partie' -and (Test-Path -LiteralPath $script:FichierPartie) -and -not (Test-PartieActive)) {
