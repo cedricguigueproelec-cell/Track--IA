@@ -47,6 +47,8 @@ sans pertes, et un input lag au plancher.
 | `MODE-PARTIE.bat` | **Avant chaque session** | Ping au minimum pendant que tu joues |
 | `RESTAURER-TOUT.bat` | Si tu n'es pas satisfait | Remet **tout** comme avant les tweaks, puis propose de redémarrer |
 | `LANCER.bat` | Quand tu veux | Le menu complet (catégories, diagnostic, restaurer) |
+| `REPARER-WINDOWS-UPDATE.bat` | Si une mise à jour Windows échoue | Répare Windows Update (section 9), avec point de restauration |
+| `ANNULER-REPARATION.bat` | Si la réparation ne te plaît pas | Remet tout comme avant la réparation |
 
 ```
    1. TWEAKS 0 DÉLAI : TOUT OPTIMISER EN UN CLIC  (à faire une fois)
@@ -319,6 +321,39 @@ faire ; dans l'ordre :
    **uniquement si le diagnostic affiche « Mode de démarrage : UEFI »**.
 4. **À ne pas toucher** : overclock manuel, tensions, C-States, HPET. Sur Intel 13e/14e gen,
    aucun overclock.
+
+---
+
+## 9. Une mise à jour Windows échoue (ex. erreur 0x800736b3)
+
+Une mise à jour qui échoue en boucle **se retélécharge et se réinstalle en fond** : ça prend
+du processeur, du disque et de la connexion, donc ça peut donner du lag en jeu.
+
+**`REPARER-WINDOWS-UPDATE.bat`** fait la réparation standard recommandée par Microsoft :
+
+1. **Point de restauration** « Avant réparation Windows Update », créé **et vérifié**. S'il ne
+   peut pas être créé, **le script s'arrête sans rien toucher**.
+2. Services de Windows Update remis en marche s'ils avaient été désactivés.
+3. **DISM** : répare la réserve de composants de Windows (cause de l'erreur 0x800736b3).
+4. **SFC** : répare les fichiers système.
+5. Dossiers de téléchargement de Windows Update **renommés** (gardés intacts, jamais supprimés),
+   pour repartir sur une base propre.
+6. Redémarrage, puis Windows Update s'ouvre tout seul : clique sur **« Rechercher des mises à jour »**.
+
+**Rien n'est supprimé** et tes fichiers personnels ne sont pas touchés. Durée : 20 à 60 minutes,
+ne joue pas pendant. Un journal est écrit dans `C:\Users\<toi>\FortniteOpti-Sauvegarde\`.
+
+**Pour revenir comme avant : `ANNULER-REPARATION.bat`.** Il remet les dossiers d'origine (les
+nouveaux sont gardés) et ouvre la Restauration du système sur le point « Avant réparation
+Windows Update ».
+
+**Si l'erreur revient malgré tout :** Paramètres > Système > Récupération > « Résoudre les
+problèmes à l'aide de Windows Update » > **« Réinstaller maintenant »**. Windows se réinstalle
+par-dessus en gardant fichiers et applis.
+
+**Bon à savoir :** une « mise à jour de la préversion » est **optionnelle**. Les mêmes correctifs
+arrivent dans la mise à jour normale du mois suivant. Pour ne plus en recevoir : Windows Update >
+désactive « Recevez les dernières mises à jour dès qu'elles sont disponibles ».
 
 ---
 
