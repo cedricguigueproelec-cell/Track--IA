@@ -77,6 +77,7 @@ $script:Coupables = @{
     'wallpaper32'        = @('Wallpaper Engine', 'Wallpaper Engine > Paramètres : « Pause » quand une autre appli est en plein écran.')
     'System'             = @('Système Windows (pilotes)', 'Souvent un pilote : mets à jour le pilote graphique, réseau (Wi-Fi) et le chipset.')
     'dwm'                = @('Compositeur d''affichage Windows', 'Signe que le jeu n''est pas en vrai plein écran : mets « Plein écran » dans Fortnite.')
+    'NVDisplay.Container' = @('Service d''affichage NVIDIA (overlay, panneau)', 'Si tu n''utilises pas l''overlay NVIDIA : NVIDIA App > Paramètres > désactive l''overlay en jeu.')
 }
 # Processus ignorés dans la recherche de coupables (le jeu, la mesure elle-même, l'inactivité).
 $script:Ignorer = @('Idle', 'FortniteClient-Win64-Shipping', 'powershell', 'pwsh', 'PresentMon-2.6.0-x64', 'conhost', 'EasyAntiCheat', 'EasyAntiCheat_EOS')
@@ -346,7 +347,8 @@ function Get-AnalyseCsv([string]$Chemin) {
     if ($lignes.Count -lt 30) { throw "seulement $($lignes.Count) images enregistrées : Fortnite était-il au premier plan, en partie ?" }
     $entetes = @($lignes[0].PSObject.Properties.Name)
 
-    $cTemps   = Get-Colonne $entetes @('TimeInSeconds', 'CPUStartTimeInSeconds', 'CPUStartTime')
+    $cTempsS  = Get-Colonne $entetes @('TimeInSeconds', 'CPUStartTimeInSeconds')
+    $cTempsMs = Get-Colonne $entetes @('TimeInMs', 'CPUStartTimeInMs')
     $cImage   = Get-Colonne $entetes @('MsBetweenPresents', 'FrameTime')
     $cEntree  = Get-Colonne $entetes @('MsAllInputToPhotonLatency', 'AllInputToPhotonLatency')
     $cClic    = Get-Colonne $entetes @('MsClickToPhotonLatency', 'ClickToPhotonLatency')
@@ -365,13 +367,17 @@ function Get-AnalyseCsv([string]$Chemin) {
     $cpu = New-Object 'System.Collections.Generic.List[double]'
     $affiche = New-Object 'System.Collections.Generic.List[double]'
     $modes = @{}; $vsync = @{}; $dechirure = @{}
+    $cumul = 0.0
 
     foreach ($l in $lignes) {
         $ft = ConvertTo-Nombre $l.$cImage
         if ($null -ne $ft -and $ft -gt 0 -and $ft -lt 1000) {
             $images.Add($ft)
-            $t = 0.0
-            if ($cTemps) { $v = ConvertTo-Nombre $l.$cTemps; if ($null -ne $v) { $t = $v } }
+            # Temps de l'image en secondes depuis le début de la mesure.
+            $cumul += $ft / 1000
+            $t = $cumul
+            if ($cTempsS) { $v = ConvertTo-Nombre $l.$cTempsS; if ($null -ne $v) { $t = $v } }
+            elseif ($cTempsMs) { $v = ConvertTo-Nombre $l.$cTempsMs; if ($null -ne $v) { $t = $v / 1000 } }
             $temps.Add($t)
         }
         foreach ($paire in @(@($cEntree, $entrees), @($cClic, $clics), @($cPcl, $pcl), @($cGpu, $gpu), @($cCpu, $cpu), @($cAffiche, $affiche))) {
@@ -474,10 +480,23 @@ function Get-FrequencesEcran {
 # ---------------------------------------------------------------------------
 function Get-Note($Ms) {
     if ($null -eq $Ms) { return @('?', 'Gray') }
-    if ($Ms -le 20) { return @('EXCELLENT', 'Green') }
-    if ($Ms -le 30) { return @('TRÈS BON', 'Green') }
-    if ($Ms -le 45) { return @('MOYEN', 'Yellow') }
+    if ($Ms -le 12) { return @('EXCELLENT', 'Green') }
+    if ($Ms -le 20) { return @('TRÈS BON', 'Green') }
+    if ($Ms -le 35) { return @('MOYEN', 'Yellow') }
     return @('LENT', 'Red')
+}
+
+# Délai de référence : Reflex s'il est présent (mesure fiable). Sinon l'estimation de
+# PresentMon, uniquement si elle est plausible : un délai plus court qu'une image est
+# impossible (avec Fortnite, PresentMon rattache parfois l'entrée à l'image suivante).
+function Get-DelaiReference($A) {
+    if ($A.Pcl -and $A.Pcl.Nombre -ge 20) {
+        return [pscustomobject]@{ Ms = $A.Pcl.Mediane; P95 = $A.Pcl.P95; Source = 'Reflex' }
+    }
+    if ($A.Entree -and $A.Entree.Nombre -ge 20 -and $A.Entree.Mediane -ge $A.Images.Mediane) {
+        return [pscustomobject]@{ Ms = $A.Entree.Mediane; P95 = $A.Entree.P95; Source = 'PresentMon' }
+    }
+    return $null
 }
 
 # Ajoute un conseil avec sa priorité (1 = le plus important).
@@ -492,31 +511,41 @@ function Show-Rapport($A, $Echantillons, $Ecran) {
 
     # 1. Délai clic / touche -> écran
     Write-Titre 'Ton délai clic / touche -> écran (mesuré)'
-    $reference = $null
-    if ($A.Entree) {
-        $reference = $A.Entree.Mediane
-        $note = Get-Note $reference
-        Write-Host ("    Délai habituel : {0}   (pire 5 % : {1})   -> {2}" -f (Format-Ms $A.Entree.Mediane), (Format-Ms $A.Entree.P95), $note[0]) -ForegroundColor $note[1]
-        if ($A.Clic) { Write-Info ("Rien que les clics souris : {0} (sur {1} images avec un clic)" -f (Format-Ms $A.Clic.Mediane), $A.Clic.Nombre) }
-        Write-Info 'C''est le temps entre ton action et l''image à l''écran, côté PC (souris et dalle de l''écran en plus).'
+    $reference = Get-DelaiReference $A
+    if ($reference) {
+        $note = Get-Note $reference.Ms
+        Write-Host ("    Délai habituel : {0}   (pire 5 % : {1})   -> {2}" -f (Format-Ms $reference.Ms), (Format-Ms $reference.P95), $note[0]) -ForegroundColor $note[1]
+        if ($reference.Source -eq 'Reflex') {
+            Write-Info 'Mesuré par NVIDIA Reflex : temps entre ton action et l''envoi de l''image à l''écran.'
+        } else {
+            Write-Info 'Estimation PresentMon (sans Reflex) : temps entre ton action et l''image à l''écran.'
+        }
+        Write-Info '(La souris, environ 1 ms, et la dalle de l''écran s''y ajoutent.)'
     } else {
-        Write-Attention 'Pas assez de clics / touches pendant la mesure pour calculer ce délai.'
-        Write-Info 'Refais la mesure en ÉDITANT et en CLIQUANT beaucoup.'
-    }
-    if ($A.Pcl) {
-        Write-Ok ("NVIDIA Reflex détecté : latence PC mesurée par Reflex = {0}" -f (Format-Ms $A.Pcl.Mediane))
+        Write-Attention 'Délai non mesurable de façon fiable sur cette mesure.'
+        if (-not $A.Pcl) { Write-Info 'Active NVIDIA Reflex dans Fortnite (cartes NVIDIA) : il mesure ce délai précisément.' }
     }
 
     # 2. FPS et stabilité
     Write-Titre 'FPS et saccades'
     Write-Info ("FPS moyen : {0:0}   |   1 % les plus bas : {1:0} FPS   |   image normale : {2}" -f $A.FpsMoyen, $A.Fps1Bas, (Format-Ms $A.Images.Mediane))
     $parMinute = $A.Saccades.Count * 60 / $A.Duree
+    $pire = 0.0
+    foreach ($sac in $A.Saccades) { if ($sac.Ms -gt $pire) { $pire = $sac.Ms } }
     if ($A.Saccades.Count -eq 0) {
         Write-Ok 'Aucune saccade : image parfaitement régulière.'
-    } elseif ($parMinute -le 5) {
-        Write-Ok ("{0} petite(s) saccade(s) en {1:0} s : c'est propre." -f $A.Saccades.Count, $A.Duree)
+    } elseif ($parMinute -le 10) {
+        Write-Ok ("{0} petite(s) saccade(s) en {1:0} s (la pire : {2}) : c'est propre." -f $A.Saccades.Count, $A.Duree, (Format-Ms $pire))
+    } elseif ($parMinute -le 40) {
+        Write-Info ("{0} saccades en {1:0} s (la pire : {2}) : normal dans Fortnite (constructions qui apparaissent, effets)." -f $A.Saccades.Count, $A.Duree, (Format-Ms $pire))
     } else {
-        Write-Attention ("{0} saccades en {1:0} s (images de plus de {2}) : c'est ce que tu ressens comme du « lag »." -f $A.Saccades.Count, $A.Duree, (Format-Ms $A.SeuilSaccade))
+        Write-Attention ("{0} saccades en {1:0} s (la pire : {2}) : c'est ce que tu ressens comme du « lag »." -f $A.Saccades.Count, $A.Duree, (Format-Ms $pire))
+    }
+    if ($A.Fps1Bas -lt 0.7 * $A.FpsMoyen) {
+        Write-Attention ("Tes FPS varient beaucoup : {0:0} en moyenne, {1:0} dans les pires moments." -f $A.FpsMoyen, $A.Fps1Bas)
+        $cible = [int][math]::Floor($A.Fps1Bas / 5) * 5
+        if ($Ecran -and $Ecran.Actuelle -gt 0 -and $Ecran.Actuelle -lt $A.FpsMoyen) { $cible = [math]::Max($cible, $Ecran.Actuelle) }
+        Add-Conseil $conseils 3 ("FPS irréguliers : essaie une limite de FPS autour de {0} dans Fortnite (avec Reflex, le délai reste bas) pour des edits plus réguliers, puis remesure." -f $cible)
     }
     if ($Ecran -and $Ecran.Actuelle -gt 0) {
         if ($Ecran.Actuelle -lt $Ecran.Maximale) {
@@ -581,7 +610,8 @@ function Show-Rapport($A, $Echantillons, $Ecran) {
         }
         $gros = @($moyennes.GetEnumerator() | ForEach-Object {
             [pscustomobject]@{ Nom = $_.Key; Cpu = $_.Value / $Echantillons.Count } } |
-            Where-Object { $_.Cpu -ge 2 } | Sort-Object -Property Cpu -Descending | Select-Object -First 5)
+            Where-Object { $_.Cpu -ge 2 -and -not ($_.Nom -in @('dwm', 'System', 'svchost', 'csrss', 'audiodg') -and $_.Cpu -lt 5) } |
+            Sort-Object -Property Cpu -Descending | Select-Object -First 5)
         if ($gros.Count -gt 0) {
             Write-Titre 'Programmes qui tournaient en fond pendant ta partie'
             foreach ($g in $gros) {
@@ -645,6 +675,7 @@ function Show-Rapport($A, $Echantillons, $Ecran) {
 }
 
 function Save-Historique($A, [string]$IdMesure) {
+    $reference = Get-DelaiReference $A
     $historique = New-Object System.Collections.ArrayList
     if (Test-Path -LiteralPath $script:FichierHistorique) {
         try {
@@ -655,8 +686,9 @@ function Save-Historique($A, [string]$IdMesure) {
     $entree = [pscustomobject]@{
         Date      = (Get-Date).ToString('dd/MM/yyyy HH:mm')
         Id        = $IdMesure
-        DelaiMs   = $(if ($A.Entree) { [math]::Round($A.Entree.Mediane, 1) } else { $null })
-        Delai95Ms = $(if ($A.Entree) { [math]::Round($A.Entree.P95, 1) } else { $null })
+        DelaiMs   = $(if ($reference) { [math]::Round($reference.Ms, 1) } else { $null })
+        Delai95Ms = $(if ($reference) { [math]::Round($reference.P95, 1) } else { $null })
+        Source    = $(if ($reference) { $reference.Source } else { $null })
         Fps       = [math]::Round($A.FpsMoyen, 0)
         Fps1Bas   = [math]::Round($A.Fps1Bas, 0)
         Saccades  = $A.Saccades.Count
@@ -668,7 +700,7 @@ function Save-Historique($A, [string]$IdMesure) {
     $json = ConvertTo-Json -InputObject @($historique.ToArray()) -Depth 4
     [System.IO.File]::WriteAllText($script:FichierHistorique, $json, (New-Object System.Text.UTF8Encoding($false)))
 
-    if ($precedent -and $null -ne $precedent.DelaiMs -and $null -ne $entree.DelaiMs) {
+    if ($precedent -and $null -ne $precedent.DelaiMs -and $null -ne $entree.DelaiMs -and [string]$precedent.Source -eq [string]$entree.Source) {
         Write-Titre 'Comparaison avec ta mesure précédente'
         $diff = $entree.DelaiMs - [double]$precedent.DelaiMs
         $texte = "Délai : {0} -> {1} ms   |   FPS : {2} -> {3}   |   saccades : {4} -> {5}" -f `
@@ -897,11 +929,11 @@ function Show-Historique {
     Write-Host ''
     Write-Host ('   {0,-17} {1,10} {2,10} {3,6} {4,8} {5,9}' -f 'Date', 'Délai', 'Pire 5%', 'FPS', '1% bas', 'Saccades') -ForegroundColor White
     foreach ($m in $mesures) {
-        $d = if ($null -ne $m.DelaiMs) { "$($m.DelaiMs) ms" } else { 'n/a' }
-        $p = if ($null -ne $m.Delai95Ms) { "$($m.Delai95Ms) ms" } else { 'n/a' }
+        $d = if ($null -ne $m.DelaiMs -and $m.Source) { "$($m.DelaiMs) ms" } else { 'n/a' }
+        $p = if ($null -ne $m.Delai95Ms -and $m.Source) { "$($m.Delai95Ms) ms" } else { 'n/a' }
         Write-Host ('   {0,-17} {1,10} {2,10} {3,6} {4,8} {5,9}' -f $m.Date, $d, $p, $m.Fps, $m.Fps1Bas, $m.Saccades)
     }
-    $avecDelai = @($mesures | Where-Object { $null -ne $_.DelaiMs })
+    $avecDelai = @($mesures | Where-Object { $null -ne $_.DelaiMs -and $_.Source })
     if ($avecDelai.Count -ge 2) {
         $meilleure = $avecDelai | Sort-Object -Property { [double]$_.DelaiMs } | Select-Object -First 1
         Write-Ok "Ta meilleure mesure : $($meilleure.DelaiMs) ms le $($meilleure.Date)."

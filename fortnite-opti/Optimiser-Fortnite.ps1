@@ -276,12 +276,47 @@ function ConvertTo-ValeurTypee($Entree) {
     }
 }
 
+# Crée un point de restauration et VÉRIFIE qu'il existe. Windows n'en crée qu'un par
+# 24 h : on lève cette limite le temps de créer le nôtre, puis on remet la valeur d'origine.
+function New-PointRestaurationVerifie([string]$Description) {
+    try { Enable-ComputerRestore -Drive "$($env:SystemDrive)\" } catch { }
+    $cle = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore'
+    $nom = 'SystemRestorePointCreationFrequency'
+    $existait = $false; $ancienne = $null
+    if (Test-Path -LiteralPath $cle) {
+        $k = Get-Item -LiteralPath $cle
+        if (@($k.GetValueNames()) -contains $nom) { $existait = $true; $ancienne = $k.GetValue($nom) }
+    }
+    $avant = 0
+    $points = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue)
+    if ($points.Count) { $avant = [int](($points | Measure-Object -Property SequenceNumber -Maximum).Maximum) }
+    try {
+        New-ItemProperty -LiteralPath $cle -Name $nom -Value 0 -PropertyType DWord -Force | Out-Null
+        Checkpoint-Computer -Description $Description -RestorePointType 'MODIFY_SETTINGS'
+    } finally {
+        if ($existait) { New-ItemProperty -LiteralPath $cle -Name $nom -Value $ancienne -PropertyType DWord -Force | Out-Null }
+        else { Remove-ItemProperty -LiteralPath $cle -Name $nom -ErrorAction SilentlyContinue }
+    }
+    $nouveau = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue |
+        Where-Object { [int]$_.SequenceNumber -gt $avant -and $_.Description -eq $Description })
+    if ($nouveau.Count -eq 0) { throw 'Windows n''a pas créé le point de restauration.' }
+}
+
+# Retourne $true si on peut continuer.
 function New-PointRestauration {
-    if ($script:PointRestaurationFait) { return }
-    $script:PointRestaurationFait = $true
-    Invoke-Etape 'Point de restauration Windows (filet de sécurité, ~1 min)' {
-        Checkpoint-Computer -Description 'Avant optimisation Fortnite' -RestorePointType 'MODIFY_SETTINGS'
-        Write-Ok 'Point de restauration prêt (Windows n''en crée qu''un par 24 h).'
+    if ($script:PointRestaurationFait) { return $true }
+    Write-Titre 'Point de restauration Windows (filet de sécurité, jusqu''à 1 min)'
+    try {
+        New-PointRestaurationVerifie 'Avant optimisation Fortnite'
+        Write-Ok 'Point de restauration « Avant optimisation Fortnite » créé et vérifié.'
+        $script:PointRestaurationFait = $true
+        return $true
+    } catch {
+        Write-Attention "Impossible de créer le point de restauration : $($_.Exception.Message)"
+        Write-Info 'Tu peux quand même tout annuler ensuite avec RESTAURER-TOUT.bat (chaque réglage est sauvegardé).'
+        if (Read-Oui 'Continuer SANS point de restauration ?') { $script:PointRestaurationFait = $true; return $true }
+        Write-Info 'Arrêté : rien n''a été modifié.'
+        return $false
     }
 }
 
@@ -1125,7 +1160,7 @@ function Invoke-Application([string]$Titre, [string[]]$Details, [scriptblock]$Se
     if ($CoupeReseau) { Write-Attention 'Internet va couper quelques secondes (redémarrage de la carte réseau).' }
     if (-not (Read-Oui 'Continuer ?')) { Write-Info 'Annulé, rien n''a été modifié.'; return }
     Read-Sauvegarde
-    New-PointRestauration
+    if (-not (New-PointRestauration)) { return }
     & $Sections
     Show-Fin
 }
@@ -1173,7 +1208,7 @@ function Invoke-Tout {
     Request-ChoixHvci
     Restore-ConfigFortnite
 
-    New-PointRestauration
+    if (-not (New-PointRestauration)) { return }
     Invoke-SectionFps        # en premier : le plan d'alimentation
     Invoke-SectionLatence
     Invoke-SectionConnexion

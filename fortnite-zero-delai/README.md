@@ -1,4 +1,42 @@
-# Analyseur de latence Fortnite : être le plus rapide en édit
+# Pack zéro délai Fortnite : être le plus rapide en édit
+
+| Fichier | Quand | Ce qu'il fait |
+|---|---|---|
+| **`ZERO-DELAI.bat`** | **Une fois** | Applique automatiquement **tous les tweaks Windows** qui réduisent le délai. **Ne touche pas aux réglages de Fortnite.** |
+| `MODE-PARTIE.bat` | Avant chaque session | Ferme ce qui tourne en fond et met Windows Update en pause le temps de la partie. |
+| `ANALYSEUR-LATENCE.bat` | Avant / après | **Mesure ton vrai délai** pendant que tu édites, et dit ce qui te ralentit. |
+| `RESTAURER-TOUT.bat` | Si ça ne te plaît pas | Remet **tout** ce que `ZERO-DELAI.bat` a changé exactement comme avant. |
+
+`Optimiser-Fortnite.ps1` et `Analyseur-Latence.ps1` sont les programmes utilisés par ces
+fichiers : garde tout dans le même dossier.
+
+## La méthode en 4 étapes
+
+1. **Mesure** avec `ANALYSEUR-LATENCE.bat` (choix 1) : note ton « délai habituel ».
+2. Double-clic sur **`ZERO-DELAI.bat`**, **Oui** à la fenêtre administrateur, puis **O**.
+   - Un **point de restauration** est créé et **vérifié** avant tout changement.
+   - Une seule question : couper l'« intégrité de la mémoire » (plus de FPS, un peu moins
+     de sécurité). C'est ton choix.
+   - **Redémarre** à la fin.
+3. **Remesure** avec l'analyseur : il compare automatiquement avec ta mesure précédente.
+4. Si ton délai a **baissé** : garde. S'il a **monté** : double-clic sur **`RESTAURER-TOUT.bat`**.
+
+Avant chaque session : **`MODE-PARTIE.bat`**.
+
+### Ce que fait `ZERO-DELAI.bat` (uniquement Windows)
+
+- **Processeur** : plan d'alimentation hautes performances (sauf Ryzen X3D), Mode Jeu, priorité aux
+  jeux, enregistrement vidéo de la Game Bar coupé, applis en arrière-plan coupées, télémétrie coupée.
+- **Latence** : écran à sa fréquence max, mise en veille USB et PCI Express coupée, souris 1:1,
+  planification GPU matérielle, pas de pop-up « touches rémanentes ».
+- **Connexion** : carte réseau sans économie d'énergie, priorité réseau pour Fortnite, mises à jour
+  Windows limitées en arrière-plan.
+
+Chaque valeur d'origine est sauvegardée, d'où la restauration exacte avec `RESTAURER-TOUT.bat`.
+
+---
+
+# Analyseur de latence
 
 Un mini logiciel qui **mesure ton vrai délai** entre ton clic (ou ta touche) et l'image à
 l'écran **pendant que tu édites**, puis te dit **précisément** ce qui te ralentit sur **ton**
@@ -7,7 +45,7 @@ PC, par ordre d'importance.
 Fini les tweaks « au feeling » : tu mesures, tu changes **une** chose, tu remesures, et tu
 gardes seulement ce qui fait vraiment baisser le chiffre.
 
-> **Il ne modifie RIEN**, ni dans Windows ni dans Fortnite : il mesure et il explique.
+> **L'analyseur ne modifie RIEN**, ni dans Windows ni dans Fortnite : il mesure et il explique.
 > Un **point de restauration** est quand même créé au lancement (un par jour), et l'option
 > **4. Revenir en arrière** l'ouvre directement.
 
@@ -41,9 +79,9 @@ SHA-256 et signature numérique d'Intel) : s'il ne correspond pas à l'original,
 
 | Résultat | Ce que ça veut dire |
 |---|---|
-| **Délai clic / touche → écran** | LE chiffre à faire baisser. Mesuré à chaque clic et chaque touche pendant tes edits. |
-| Note | **EXCELLENT** ≤ 20 ms · **TRÈS BON** ≤ 30 ms · **MOYEN** ≤ 45 ms · **LENT** au-delà |
-| FPS moyen et 1 % les plus bas | Les « 1 % bas » montrent les chutes : plus ils sont proches de la moyenne, plus c'est fluide. |
+| **Délai habituel** | LE chiffre à faire baisser. Mesuré par **NVIDIA Reflex** si tu l'as activé (le plus fiable), sinon estimé par PresentMon. |
+| Note | **EXCELLENT** ≤ 12 ms · **TRÈS BON** ≤ 20 ms · **MOYEN** ≤ 35 ms · **LENT** au-delà |
+| FPS moyen et 1 % les plus bas | Les « 1 % bas » montrent les chutes : plus ils sont proches de la moyenne, plus c'est régulier. Si l'écart est grand, l'analyseur te propose une limite de FPS. |
 | **Saccades** + **qui les cause** | Chaque image anormalement longue, et le programme qui tournait à ce moment-là (Windows Update, antivirus, navigateur, Discord...). |
 | Mode d'affichage | « Hardware... » = affichage direct (le mieux). « Composed... » = l'image passe par Windows = environ 1 image de délai en plus. |
 | V-Sync | Activée dans le jeu = une des plus grosses sources de délai. |
@@ -92,9 +130,9 @@ touche facile (F, E ou bouton latéral de la souris).
 
 ---
 
-## Sécurité et confidentialité
+## Sécurité et confidentialité de l'analyseur
 
-- **Rien n'est modifié** dans Windows ni dans Fortnite. Le seul réglage touché est la limite
+- **L'analyseur ne modifie rien** dans Windows ni dans Fortnite. Le seul réglage touché est la limite
   « un point de restauration par 24 h », levée le temps de créer le point puis **remise comme avant**.
 - **PresentMon** lit les événements d'affichage de Windows : il ne touche pas au jeu.
 - **Fichiers créés**, chez toi uniquement :
